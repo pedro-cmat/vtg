@@ -2,7 +2,7 @@
 % Please edit documentation in R/writeln.R
 \name{writeln}
 \alias{writeln}
-\title{Write a string to STDOUT without the standard '[1]' prefix.}
+\title{Write a string to STDOUT without the standard '\link{1}' prefix.}
 \usage{
 writeln(..., sep = " ")
 }
@@ -12,7 +12,7 @@ writeln(..., sep = " ")
 \item{sep}{Separator to use between strings. Defaults to a single space}
 }
 \description{
-Write a string to STDOUT without the standard '[1]' prefix.
+Write a string to STDOUT without the standard '\link{1}' prefix.
 }
 \examples{
 writeln("Hello, world!")

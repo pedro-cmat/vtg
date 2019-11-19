@@ -147,11 +147,115 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
       return(self$request("PUT", path, data))
     },
 
-    # Create a task on the server
-    # FIXME: implement!
-    # create_task = function() {
+    # Create a data structure used as input for a call to the distributed
+    # learning infrastructure.
+    create_task_input = function(method, ...) {
+        # Construct the input_data list from the ellipsis.
+        arguments <- list(...)
+
+        if (is.null(names(arguments))) {
+            args <- arguments
+            kwargs <- list()
+
+        } else {
+            args <- arguments[names(arguments) == ""]
+            kwargs <- arguments[names(arguments) != ""]
+        }
+
+        # Serialize the argument values to ASCII
+        fp <- textConnection("arg_data", open="w")
+        saveRDS(args, fp, ascii=T)
+        close(fp)
+
+        # Serialize the keyword argument values to ASCII
+        fp <- textConnection("kwarg_data", open="w")
+        saveRDS(kwargs, fp, ascii=T)
+        close(fp)
+
+        # Create the data structure
+        input_data <- list(
+            method=method,
+            args=arg_data,
+            kwargs=kwarg_data
+        )
+
+        return(input_data)
+    },
+
+    # Wait for the results of a distributed task and return the task,
+    # including results.
     #
-    # }
+    # Params:
+    #   client: ptmclient::Client instance.
+    #   task: list with the key id (representing the task id)
+    #
+    # Return:
+    #   task (list) including results
+    wait.for.results = function(task) {
+
+        path = sprintf('/task/%s', task$id)
+
+        while(TRUE) {
+            r <- self$GET(path)
+
+            if (content(r)$complete) {
+                break
+
+            } else {
+                # Wait 30 seconds
+                writeln("Waiting for results ...")
+                Sys.sleep(5)
+            }
+        }
+
+        path = sprintf('/task/%s?include=results', task$id)
+        r <- self$GET(path)
+
+        return(content(r))
+    },
+
+    # Execute a method on the distributed learning infrastructure.
+    #
+    # This entails ...
+    #  * creating a task and letting the hubs execute the method
+    #    specified in the 'input' parameter
+    #  * waiting for all results to arrive
+    #  * deserializing each sites' result using readRDS
+    #
+    # Params:
+    #   client: ptmclient::Client instance.
+    #   method: name of the method to call on the distributed learning
+    #           infrastructure
+    #   ...: (keyword) arguments to provide to method. The arguments are serialized
+    #        using `saveRDS()` by `create_task_input()`.
+    #
+    # Return:
+    #   return value of called method
+    call = function(image, method, ...) {
+        # Create the json structure for the call to the server
+        input <- self$create_task_input(method, ...)
+
+        task = list(
+            "name"="",
+            "image"=image,
+            "collaboration_id"=self$get("collaboration_id"),
+            "input"=input,
+            "description"=""
+        )
+
+        # Create the task on the server; this returs the task with its id
+        r <- self$POST('/task', task)
+
+        # Wait for the results to come in
+        result_dict <- self$wait.for.results(content(r))
+
+        # result_dict is a list with the keys _id, id, description, complete, image,
+        # collaboration, results, etc. the entry "results" is itself a list with
+        # one entry for each site. The site's actual result is contained in the
+        # named list member 'result' and is encoded using saveRDS.
+        sites <- result_dict$results
+        return(self$process.results(sites))
+    },
 
     # Return a string representation of this Client
     repr = function() {
@@ -166,18 +270,5 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
   return(self)
 }
 
-
-# ******************************************************************************
-# ---- class MockClient ----
-# ******************************************************************************
-
-#' Fake client
-MockClient <- function(datasets) {
-  env <- environment()
-  self <- list(
-    datasets = datasets
-  )
-  return(self)
-}
 
 
