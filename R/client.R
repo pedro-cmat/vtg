@@ -86,7 +86,7 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
 
       # Apparently we were succesful. Retrieve the details from the server
       # response, which includes the key "access_token".
-      response_data <- content(r)
+      response_data <- httr::content(r)
       list2env(response_data, env)
 
       return("OK")
@@ -172,7 +172,7 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
         path = sprintf('/task/%s?include=results', task$id)
         r <- self$GET(path)
 
-        return(content(r))
+        return(httr::content(r))
     },
 
     set.task.image = function(image, task.name='') {
@@ -213,7 +213,7 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
         r <- self$POST('/task', task)
 
         # Wait for the results to come in
-        result_dict <- self$wait.for.results(content(r))
+        result_dict <- self$wait.for.results(httr::content(r))
 
         # result_dict is a list with the keys _id, id, description, complete, image,
         # collaboration, results, etc. the entry "results" is itself a list with

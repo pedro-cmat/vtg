@@ -39,7 +39,7 @@ MockClient <- function(datasets) {
             writeln(sprintf('** Mocking call to "%s" **', method))
             datasets <- self$datasets
             input <- create.task.input(method, ...)
-            input <- toJSON(input)
+            input <- rjson::toJSON(input)
 
             # Create a list to store the responses from the individual sites
             sites <- list()

@@ -8,7 +8,7 @@
 dispatch.RPC <- function(df, input) {
     # Determine which method was requested and combine arguments and keyword
     # arguments in a single variable
-    input <- fromJSON(input)
+    input <- rjson::fromJSON(input)
     method <- sprintf("RPC_%s", input$method)
 
     input$args <- readRDS(textConnection(input$args))
