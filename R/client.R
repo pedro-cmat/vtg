@@ -1,7 +1,3 @@
-# Libraries
-library(httr)
-library(rjson)
-
 # ******************************************************************************
 # ---- class Client ----
 # ******************************************************************************
@@ -39,13 +35,13 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
     dict = env,
 
     # Generic getter
-    get = function(x) {
-      return(get(x, env))
+    get = function(name) {
+      return(get(name, env))
     },
 
     # Generic setter
-    set = function(x, value) {
-      assign(x, value, env)
+    set = function(name, value) {
+      assign(name, value, env)
     },
 
     # Authenticate with the server; sets the access and refresh tokens.
@@ -59,7 +55,7 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
         password=env$password
       )
 
-      r <- POST(url, body=data, encode="json")
+      r <- httr::POST(url, body=data, encode="json")
 
       if (r$status_code != 200) {
         stop(sprintf("Could not authenticate: %s", http_status(r)$message))
@@ -67,7 +63,7 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
 
       # Apparently we were succesful. Retrieve the details from the server
       # response.
-      response_data <- content(r)
+      response_data <- httr::content(r)
       list2env(response_data, env)
 
       return("OK")
@@ -102,18 +98,18 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
       token <- sprintf('Bearer %s', env$access_token)
 
       if (method == 'GET') {
-        r <- GET(url, add_headers(Authorization=token))
+        r <- httr::GET(url, httr::add_headers(Authorization=token))
 
       } else if (method == 'POST') {
-        r <- POST(url, body=data, encode="json", add_headers(Authorization=token))
+        r <- httr::POST(url, body=data, encode="json", httr::add_headers(Authorization=token))
 
       } else if (method == 'PUT') {
-        r <- PUT(url, body=data, encode="json", add_headers(Authorization=token))
+        r <- httr::PUT(url, body=data, encode="json", httr::add_headers(Authorization=token))
 
       }
 
       if (r$status_code != 200) {
-        msg <- sprintf("Request unsuccesful: %s", http_status(r)$message)
+        msg <- sprintf("Request unsuccesful: %s", httr::http_status(r)$message)
 
         if (first_try) {
           writeln(msg)
@@ -147,41 +143,6 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
       return(self$request("PUT", path, data))
     },
 
-    # Create a data structure used as input for a call to the distributed
-    # learning infrastructure.
-    create_task_input = function(method, ...) {
-        # Construct the input_data list from the ellipsis.
-        arguments <- list(...)
-
-        if (is.null(names(arguments))) {
-            args <- arguments
-            kwargs <- list()
-
-        } else {
-            args <- arguments[names(arguments) == ""]
-            kwargs <- arguments[names(arguments) != ""]
-        }
-
-        # Serialize the argument values to ASCII
-        fp <- textConnection("arg_data", open="w")
-        saveRDS(args, fp, ascii=T)
-        close(fp)
-
-        # Serialize the keyword argument values to ASCII
-        fp <- textConnection("kwarg_data", open="w")
-        saveRDS(kwargs, fp, ascii=T)
-        close(fp)
-
-        # Create the data structure
-        input_data <- list(
-            method=method,
-            args=arg_data,
-            kwargs=kwarg_data
-        )
-
-        return(input_data)
-    },
-
     # Wait for the results of a distributed task and return the task,
     # including results.
     #
@@ -198,7 +159,7 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
         while(TRUE) {
             r <- self$GET(path)
 
-            if (content(r)$complete) {
+            if (httr::content(r)$complete) {
                 break
 
             } else {
@@ -212,6 +173,11 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
         r <- self$GET(path)
 
         return(content(r))
+    },
+
+    set.task.image = function(image, task.name='') {
+        self$set('image', image)
+        self$set('task.name', task.name)
     },
 
     # Execute a method on the distributed learning infrastructure.
@@ -231,13 +197,13 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
     #
     # Return:
     #   return value of called method
-    call = function(image, method, ...) {
+    call = function(method, ...) {
         # Create the json structure for the call to the server
-        input <- self$create_task_input(method, ...)
+        input <- create.task.input(method, ...)
 
         task = list(
-            "name"="",
-            "image"=image,
+            "name"=self$get("task.name"),
+            "image"=self$get("image"),
             "collaboration_id"=self$get("collaboration_id"),
             "input"=input,
             "description"=""
@@ -254,7 +220,7 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
         # one entry for each site. The site's actual result is contained in the
         # named list member 'result' and is encoded using saveRDS.
         sites <- result_dict$results
-        return(self$process.results(sites))
+        return(process.results(sites))
     },
 
     # Return a string representation of this Client

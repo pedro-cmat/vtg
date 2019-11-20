@@ -4,6 +4,25 @@ MockClient <- function(datasets) {
     self <- list(
         datasets = datasets,
 
+        # Generic getter
+        get = function(name) {
+            return(get(name, env))
+        },
+
+        # Generic setter
+        set = function(name, value) {
+            assign(name, value, env)
+        },
+
+        authenticate = function() {
+            # pass ...
+        },
+
+        set.task.image = function(image, task.name='') {
+            self$set('image', image)
+            self$set('task.name', task.name)
+        },
+
         # Mock an RPC call to all sites.
         #
         # Params:
@@ -15,11 +34,11 @@ MockClient <- function(datasets) {
         #
         # Return:
         #   return value of called method
-        call <- function(client, method, ...) {
+        call = function(method, ...) {
 
             writeln(sprintf('** Mocking call to "%s" **', method))
-            datasets <- client$datasets
-            input <- create_task_input(method, ...)
+            datasets <- self$datasets
+            input <- create.task.input(method, ...)
             input <- toJSON(input)
 
             # Create a list to store the responses from the individual sites
