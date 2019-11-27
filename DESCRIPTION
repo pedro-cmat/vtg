@@ -13,6 +13,7 @@ RoxygenNote: 7.0.0
 Roxygen: list(markdown = TRUE)
 Imports:
     httr,
-    rjson
+    rjson,
+    progress
 
 

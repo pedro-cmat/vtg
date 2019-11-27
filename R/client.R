@@ -23,13 +23,12 @@
 #' )
 #'
 #' tasks <- client$GET("/task")
-Client <- function(host, username, password, collaboration_id, api_path='') {
+Client <- function(host, username='', password='', collaboration_id=NULL, api_path='') {
   # Function arguments are automatically available in the
   # environment, so no need to assign them explicitly.
   env <- environment()
 
-  # Define the class methods. Attributes are accessed through
-  # get/set
+  # Define the class methods. Attributes are accessed through get/set
   self <- list(
     # Convenient access to the environment
     dict = env,
@@ -45,10 +44,15 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
     },
 
     # Authenticate with the server; sets the access and refresh tokens.
-    authenticate = function() {
+    authenticate = function(username='', password='') {
       # Create the URL and data for the JSON body
       # url <- paste(env$host, env$api_path, '/token', sep='')
       url <- paste(env$host, env$api_path, '/token/user', sep='')
+
+      if (username != '') {
+          self$set('username', username)
+          self$set('password', password)
+      }
 
       data <- list(
         username=env$username,
@@ -67,6 +71,31 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
       list2env(response_data, env)
 
       return("OK")
+    },
+
+    getCollaborations = function() {
+        user <- httr::content(self$GET(self$get('user_url')))
+
+        organization <- httr::content(
+            self$GET(sprintf('/organization/%i', user$organization))
+        )
+
+        collaborations <- list()
+
+        for (collab_url in organization$collaborations) {
+            collaboration <- httr::content(self$GET(collab_url))
+            collaborations[[as.character(collaboration$id)]] <- collaboration$name
+        }
+
+        collaborations <- data.frame(unlist(collaborations))
+        collaborations <- cbind(id=rownames(collaborations), collaborations)
+        colnames(collaborations) <- c('id', 'name')
+
+        return(collaborations)
+    },
+
+    setCollaborationId = function(collaboration_id) {
+        self$set('collaboration_id', collaboration_id)
     },
 
     # Refresh the access token using the refresh token
@@ -156,6 +185,14 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
 
         path = sprintf('/task/%s', task$id)
 
+        # Create the progress bar
+        pb <- progress::progress_bar$new(
+            format="  waiting for results for task ':task' in :elapsed",
+            clear=FALSE,
+            total=1e7,
+            width=60
+        )
+
         while(TRUE) {
             r <- self$GET(path)
 
@@ -163,11 +200,14 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
                 break
 
             } else {
-                # Wait 30 seconds
-                writeln("Waiting for results ...")
-                Sys.sleep(5)
+                # writeln("Waiting for results ...")
+                pb$tick(tokens=list(task=path))
+                Sys.sleep(1)
             }
         }
+
+        # Finish the progress bar
+        pb$tick(1e7, tokens=list(task=path))
 
         path = sprintf('/task/%s?include=results', task$id)
         r <- self$GET(path)
@@ -211,9 +251,12 @@ Client <- function(host, username, password, collaboration_id, api_path='') {
 
         # Create the task on the server; this returs the task with its id
         r <- self$POST('/task', task)
+        task <- httr::content(r)
+
+        writeln(sprintf('Task has been assigned id %i', task$id))
 
         # Wait for the results to come in
-        result_dict <- self$wait.for.results(httr::content(r))
+        result_dict <- self$wait.for.results(task)
 
         # result_dict is a list with the keys _id, id, description, complete, image,
         # collaboration, results, etc. the entry "results" is itself a list with
