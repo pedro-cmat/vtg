@@ -12,8 +12,10 @@ LazyData: true
 RoxygenNote: 7.0.0
 Roxygen: list(markdown = TRUE)
 Imports:
+    R6,
     httr,
     rjson,
-    progress
+    progress,
+    lgr
 
 
