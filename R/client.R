@@ -253,14 +253,21 @@ Client <- R6::R6Class(
             writeln(sprintf('Task has been assigned id %i', task$id))
 
             # Wait for the results to come in
-            result_dict <- self$wait.for.results(task)
+            task <- self$wait.for.results(task)
 
-            # result_dict is a list with the keys _id, id, description, complete, image,
-            # collaboration, results, etc. the entry "results" is itself a list with
-            # one entry for each site. The site's actual result is contained in the
+            # task is a list with the following keys:
+            #  - _id
+            #  - id
+            #  - description
+            #  - complete
+            #  - imag
+            #  - collaboration
+            #  - results
+            # The entry "results" is itself a list (dict) with one entry
+            # for each site. The site's actual result is contained in the
             # named list member 'result' and is encoded using saveRDS.
-            sites <- result_dict$results
-            return(process.results(sites))
+            site_results <- task$results
+            return(process.results(site_results))
         },
 
         # Return a string representation of this Client

@@ -19,9 +19,6 @@ dispatch.RPC <- function(df, input) {
     # Call the method
     writeln(sprintf("Calling %s", method))
 
-    # result = do.call(method, args)
-    # writeln('dispatch_RPC - result:')
-
     result <- tryCatch({
         result <- list(result=do.call(method, args))
 
