@@ -3,7 +3,7 @@
 ## Installation
 Run the following in the R console to install the package and its dependencies:
 ```R
-devtools::install_github('mellesies/vantage.infrastructure')
+devtools::install_github('mellesies/vtg')
 ```
 
 ## Example use
@@ -17,7 +17,7 @@ setup.client <- function() {
   api_path <- ''
   
   # Create the client
-  client <- vantage.infrastructure::Client$new(host, api_path=api_path)
+  client <- vtg::Client$new(host, api_path=api_path)
   client$authenticate(username, password)
 
   return(client)
@@ -33,7 +33,7 @@ client$getCollaborations()
 client$setCollaborationId(1)
 
 # Call a dockerized algorithm to get a list of all column names
-image.name <- "harbor.distributedlearning.ai/vantage/vantage.basic:test"
+image.name <- "harbor.distributedlearning.ai/vantage/vtg.basic:test"
 
 client$set.task.image(
     image.name,
