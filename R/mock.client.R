@@ -1,5 +1,5 @@
 #' Fake client
-MockClient <- function(datasets) {
+MockClient <- function(datasets, pkgname='') {
     env <- environment()
     self <- list(
         datasets = datasets,
@@ -14,13 +14,17 @@ MockClient <- function(datasets) {
             assign(name, value, env)
         },
 
-        authenticate = function() {
+        authenticate = function(username='', password='') {
             # pass ...
         },
 
         set.task.image = function(image, task.name='') {
             self$set('image', image)
             self$set('task.name', task.name)
+        },
+
+        set.pkgname = function(pkg) {
+            self$set('pkgname', pkg)
         },
 
         # Mock an RPC call to all sites.
@@ -40,6 +44,7 @@ MockClient <- function(datasets) {
             datasets <- self$datasets
             input <- create.task.input(method, ...)
             input <- rjson::toJSON(input)
+            pkg <- self$get('pkgname')
 
             # Create a list to store the responses from the individual sites
             sites <- list()
@@ -47,7 +52,7 @@ MockClient <- function(datasets) {
             # Mock calling the RPC method on each site
             for (k in 1:length(datasets)) {
                 sites[[k]] <- list(
-                    result = dispatch.RPC(datasets[[k]], input),
+                    result = dispatch.RPC(datasets[[k]], input, pkg=pkg),
                     log = "this was a mocked call",
                     node = sprintf("/node/%i", k)
                 )

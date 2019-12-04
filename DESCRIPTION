@@ -1,4 +1,4 @@
-Package: vantage.infrastructure
+Package: vtg
 Type: Package
 Title: Utilities for the Vantage Federated Learning Infrastructure
 Version: 0.1.0

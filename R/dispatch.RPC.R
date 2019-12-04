@@ -5,7 +5,7 @@
 #'              the keys `method`, `args` and `kwargs`.
 #'
 #' @return Output depends on RPC call.
-dispatch.RPC <- function(df, input) {
+dispatch.RPC <- function(df, input, pkg='') {
     # Determine which method was requested and combine arguments and keyword
     # arguments in a single variable
     input <- rjson::fromJSON(input)
@@ -20,11 +20,16 @@ dispatch.RPC <- function(df, input) {
     writeln(sprintf("Calling %s", method))
 
     result <- tryCatch({
-        result <- list(result=do.call(method, args))
+        if (pkg == '') {
+            result <- list(result=do.call(method, args))
+        } else {
+            rpc <- eval(parse(text=sprintf("%s::%s", pkg, method)))
+            result <- list(result=do.call(rpc, args))
+        }
 
     }, error = function(e) {
         error_msg <- e$message
-        print(paste('ERROR encountered while calling', method, ':', error_msg))
+        writeln(glue::glue('ERROR encountered while calling "{method}": {error_msg}'))
         return(list(error=error_msg))
 
     })

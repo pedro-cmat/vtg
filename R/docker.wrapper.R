@@ -12,7 +12,7 @@
 #' (de)serialization is performed in `dispatch.RPC()` to enable testing.
 #'
 #' @return `null`; output will be written to `output.txt`
-docker.wrapper <- function() {
+docker.wrapper <- function(pkg='') {
     # TODO: Consider wrapping function body in a tryCatch clause.
     #       This way any issues with dispatching can be more easily debugged.
 
@@ -26,7 +26,7 @@ docker.wrapper <- function() {
     input_data <- readChar(filename, file.info(filename)$size)
 
     writeln("Dispatching ...")
-    result <- dispatch.RPC(df, input_data)
+    result <- dispatch.RPC(df, input_data, pkg=pkg)
 
     # Write result to disk
     writeln("Writing result to disk .. ")
