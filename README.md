@@ -1,4 +1,6 @@
-# vantage.infrastructure
+# vtg
+
+R package that supports running algorithms on the [Vantage6](https://github.com/IKNL/VANTAGE6) federated infrastructure. Contains a `Client` and functions that facillitate running dockerized algorithms.
 
 ## Installation
 Run the following in the R console to install the package and its dependencies:
