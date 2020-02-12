@@ -7,6 +7,7 @@ Client <- R6::R6Class(
         password = NULL,
         collaboration_id = NULL,
         api_path = NULL,
+        version = NULL,
 
         user_url = NULL,
         access_token = NULL,
@@ -25,8 +26,15 @@ Client <- R6::R6Class(
             self$password <- password
             self$collaboration_id <- collaboration_id
             self$api_path <- api_path
-
             self$log <- lgr::get_logger("vantage/infrastructure/client")
+
+            url <- glue::glue('{host}{api_path}/version')
+            r <- httr::GET(url)
+            self$version <- httr::content(r)$version
+
+            api_version <- self$getVersion()
+            self$log$debug(glue::glue('Using API version {api_version}'))
+
         },
 
         # Methods
@@ -51,7 +59,7 @@ Client <- R6::R6Class(
             r <- httr::POST(url, body=data, encode="json")
 
             if (r$status_code != 200) {
-                stop(sprintf("Could not authenticate: %s", http_status(r)$message))
+                stop(sprintf("Could not authenticate: %s", httr::http_status(r)$message))
             }
 
             # Apparently we were succesful. Retrieve the details from the server
@@ -66,25 +74,62 @@ Client <- R6::R6Class(
             return("OK")
         },
 
+        getVersion = function() {
+            if (is.null(self$version)) {
+                self$version <- httr::content(self$GET('/version'))$version
+            }
+
+            return(self$version)
+        },
+
         getCollaborations = function() {
+            api_version <- self$getVersion()
             user <- httr::content(self$GET(self$user_url))
 
-            organization <- httr::content(
-                self$GET(sprintf('/organization/%i', user$organization))
-            )
+            # organization <- httr::content(
+            #     self$GET(sprintf('/organization/%i', user$organization))
+            # )
+
+            if (api_version == "0.1dev2") {
+                organization_id <- user$organization
+            } else if (api_version == "0.3.0-alpha4") {
+                organization_id <- user$organization$id
+            }
+
+            self$log$debug(glue::glue('Using organization_id {organization_id}'))
+
+            organization <- self$getOrganization(organization_id)
 
             collaborations <- list()
 
-            for (collab_url in organization$collaborations) {
-                collaboration <- httr::content(self$GET(collab_url))
-                collaborations[[as.character(collaboration$id)]] <- collaboration$name
+            for (collab in organization$collaborations) {
+                # self$log$debug(glue::glue('Processing collaboration {collab$id}'))
+                collaboration_id <- as.character(collab$id)
+
+                if (api_version == "0.1dev2") {
+                    # In previous versions, the list contained (relative) URLs
+                    collaboration <- httr::content(self$GET(collab))
+                    collaborations[[collaboration_id]] <- collaboration$name
+
+                } else if (api_version == "0.3.0-alpha4") {
+                    # In newer versions, the list consists of (JSON) objects
+                    collaboration <- httr::content(self$GET(collab$link))
+                    collaborations[[collaboration_id]] <- collaboration$name
+                }
             }
+
 
             collaborations <- data.frame(unlist(collaborations))
             collaborations <- cbind(id=rownames(collaborations), collaborations)
             colnames(collaborations) <- c('id', 'name')
 
             return(collaborations)
+        },
+
+        getOrganization = function(organization_id) {
+            return(httr::content(
+                self$GET(sprintf('/organization/%i', organization_id))
+            ))
         },
 
         setCollaborationId = function(collaboration_id) {
