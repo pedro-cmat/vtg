@@ -1,6 +1,6 @@
 .onLoad <- function(libname, pkgname) {
     # writeln()
-    # writeln('vantage.basic .onLoad')
+    # writeln('vtg .onLoad')
     # writeln(paste('  libname:', libname))
     # writeln(paste('  pkgname:', pkgname))
     # writeln()
@@ -14,7 +14,7 @@
 }
 
 .onAttach <- function(libname, pkgname) {
-    # writeln('vantage.basic .onAttach')
+    # writeln('vtg .onAttach')
     # writeln(paste('  libname:', libname))
     # writeln(paste('  pkgname:', pkgname))
     # writeln()

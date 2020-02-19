@@ -3,7 +3,7 @@ process.results = function(site_results) {
     errors <- c()
 
     for (k in 1:length(site_results)) {
-        writeln(paste('Reading results for site', k))
+        vtg::log$trace(paste('Reading results for site', k))
         # The RDS encoded result is a list, with *one* of two keys:
         #  - result
         #  - error

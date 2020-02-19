@@ -164,7 +164,7 @@ Client <- R6::R6Class(
             url <- paste(self$host, self$api_path, path, sep='')
             token <- sprintf('Bearer %s', self$access_token)
 
-            self$log$debug("request:", method=method, url=url)
+            self$log$trace("request:", method=method, url=url)
 
             if (method == 'GET') {
                 r <- httr::GET(url, httr::add_headers(Authorization=token))
@@ -222,16 +222,21 @@ Client <- R6::R6Class(
         # Return:
         #   task (list) including results
         wait.for.results = function(task) {
+            # options(use_progress_bar=F)
+            use_progress_bar <- getOption('vtg.use_progress_bar', T)
 
             path = sprintf('/task/%s', task$id)
 
             # Create the progress bar
-            pb <- progress::progress_bar$new(
-                format="  waiting for results for task ':task' in :elapsed",
-                clear=FALSE,
-                total=1e7,
-                width=60
-            )
+            if (use_progress_bar) {
+                pb <- progress::progress_bar$new(
+                    format="  waiting for results for task ':task' in :elapsed",
+                    clear=FALSE,
+                    total=1e7,
+                    width=60
+                )
+            }
+
 
             while(TRUE) {
                 r <- self$GET(path)
@@ -241,13 +246,23 @@ Client <- R6::R6Class(
 
                 } else {
                     # writeln("Waiting for results ...")
-                    pb$tick(tokens=list(task=path))
+                    if (use_progress_bar) {
+                        pb$tick(tokens=list(task=path))
+                    } else {
+                        cat('.')
+                        flush.console()
+                    }
+
                     Sys.sleep(1)
                 }
             }
 
-            # Finish the progress bar
-            pb$tick(1e7, tokens=list(task=path))
+            if (use_progress_bar) {
+                # Finish the progress bar
+                pb$tick(1e7, tokens=list(task=path))
+            } else {
+                writeln('')
+            }
 
             path = sprintf('/task/%s?include=results', task$id)
             r <- self$GET(path)
@@ -295,7 +310,7 @@ Client <- R6::R6Class(
             r <- self$POST('/task', task)
             task <- httr::content(r)
 
-            writeln(sprintf('Task has been assigned id %i', task$id))
+            vtg::log$info(sprintf('Task has been assigned id %i', task$id))
 
             # Wait for the results to come in
             task <- self$wait.for.results(task)
