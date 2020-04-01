@@ -21,16 +21,18 @@ docker.wrapper <- function(pkg='') {
     df <- read.csv(database_uri)
 
     # Read the contents of file input.txt into 'input_data'
-    writeln("Loading input.txt")
-    filename <- 'input.txt'
-    input_data <- readChar(filename, file.info(filename)$size)
+    input_file <- Sys.getenv("INPUT_FILE")
+    writeln(glue::glue("Loading data from {input_file}"))
+    input_data <- readChar(input_file, file.info(input_file)$size)
 
     writeln("Dispatching ...")
     result <- dispatch.RPC(df, input_data, pkg=pkg)
 
     # Write result to disk
-    writeln("Writing result to disk .. ")
-    writeLines(result, "output.txt")
+    output_file <- Sys.getenv("OUTPUT_FILE")
+    writeln(glue::glue("Writing data from {output_file}"))
+
+    write(result, output_file)
 
     writeln("")
     writeln("[DONE!]")

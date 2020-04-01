@@ -6,6 +6,7 @@ Client <- R6::R6Class(
         username = NULL,
         password = NULL,
         collaboration_id = NULL,
+        collaboration = NULL,
         api_path = NULL,
         version = NULL,
 
@@ -83,18 +84,8 @@ Client <- R6::R6Class(
         },
 
         getCollaborations = function() {
-            api_version <- self$getVersion()
-            user <- httr::content(self$GET(self$user_url))
-
-            # organization <- httr::content(
-            #     self$GET(sprintf('/organization/%i', user$organization))
-            # )
-
-            if (api_version == "0.1dev2") {
-                organization_id <- user$organization
-            } else if (api_version == "0.3.0-alpha4") {
-                organization_id <- user$organization$id
-            }
+            user <- httr::content(self$GET(self$user_url, prefix.api.path=F))
+            organization_id <- user$organization$id
 
             self$log$debug(glue::glue('Using organization_id {organization_id}'))
 
@@ -106,16 +97,8 @@ Client <- R6::R6Class(
                 # self$log$debug(glue::glue('Processing collaboration {collab$id}'))
                 collaboration_id <- as.character(collab$id)
 
-                if (api_version == "0.1dev2") {
-                    # In previous versions, the list contained (relative) URLs
-                    collaboration <- httr::content(self$GET(collab))
-                    collaborations[[collaboration_id]] <- collaboration$name
-
-                } else if (api_version == "0.3.0-alpha4") {
-                    # In newer versions, the list consists of (JSON) objects
-                    collaboration <- httr::content(self$GET(collab$link))
-                    collaborations[[collaboration_id]] <- collaboration$name
-                }
+                collaboration <- httr::content(self$GET(collab$link, prefix.api.path=F))
+                collaborations[[collaboration_id]] <- collaboration$name
             }
 
 
@@ -132,8 +115,25 @@ Client <- R6::R6Class(
             ))
         },
 
+        getCollaboration = function(collaboration_id) {
+            return(httr::content(
+                self$GET(sprintf('/collaboration/%i', collaboration_id))
+            ))
+        },
+
         setCollaborationId = function(collaboration_id) {
             self$collaboration_id <- collaboration_id
+            self$collaboration <- self$getCollaboration(collaboration_id)
+
+            for (org in self$collaboration$organizations) {
+                organization <- httr::content(self$GET(org$link, prefix.api.path=F))
+
+                # Decode the base64-encoded public key
+                decoded <- base64enc::base64decode(organization$public_key)
+                organization$public_key <- rawToChar(decoded)
+
+                self$collaboration$organizations[[org$id]] <- organization
+            }
         },
 
         # Refresh the access token using the refresh token
@@ -142,10 +142,10 @@ Client <- R6::R6Class(
                 stop("Not authenticated!")
             }
 
-            url <- paste(env$host, env$refresh_url, sep='')
-            token <- sprintf('Bearer %s', env$refresh_token)
+            url <- paste(self$host, self$refresh_url, sep='')
+            token <- sprintf('Bearer %s', self$refresh_token)
 
-            r <- POST(url, add_headers(Authorization=token))
+            r <- httr::POST(url, httr::add_headers(Authorization=token))
 
             if (r$status_code != 200) {
                 stop("Could not refresh token!?")
@@ -160,8 +160,13 @@ Client <- R6::R6Class(
         },
 
         # Perform a request to the server
-        request = function(method, path, data=NULL, first_try=T) {
-            url <- paste(self$host, self$api_path, path, sep='')
+        request = function(method, path, data=NULL, first_try=T, prefix.api.path=T) {
+            if (prefix.api.path) {
+                url <- paste(self$host, self$api_path, path, sep='')
+            } else {
+                url <- paste(self$host, path, sep='')
+            }
+
             token <- sprintf('Bearer %s', self$access_token)
 
             self$log$trace("request:", method=method, url=url)
@@ -198,18 +203,18 @@ Client <- R6::R6Class(
         },
 
         # Perform a GET request to the server
-        GET = function(path) {
-            return(self$request("GET", path))
+        GET = function(path, prefix.api.path=T) {
+            return(self$request("GET", path, prefix.api.path=prefix.api.path))
         },
 
         # Perform a POST request to the server
-        POST = function(path, data=NULL) {
-            return(self$request("POST", path, data))
+        POST = function(path, data=NULL, prefix.api.path=T) {
+            return(self$request("POST", path, data, prefix.api.path=prefix.api.path))
         },
 
         # Perform a PUT request to the server
-        PUT = function(path, data=NULL) {
-            return(self$request("PUT", path, data))
+        PUT = function(path, data=NULL, prefix.api.path=T) {
+            return(self$request("PUT", path, data, prefix.api.path=prefix.api.path))
         },
 
         # Wait for the results of a distributed task and return the task,
@@ -284,7 +289,6 @@ Client <- R6::R6Class(
         #  * deserializing each sites' result using readRDS
         #
         # Params:
-        #   client: ptmclient::Client instance.
         #   method: name of the method to call on the distributed learning
         #           infrastructure
         #   ...: (keyword) arguments to provide to method. The arguments are serialized
@@ -297,14 +301,24 @@ Client <- R6::R6Class(
 
             # Create the json structure for the call to the server
             input <- create.task.input(method, ...)
+            organizations <- c()
+
+            for (i in 1:length(self$collaboration$organizations)) {
+                org <- self$collaboration$organizations[[i]]
+                organizations[[i]] <- list(id=org$id, input=input)
+            }
 
             task = list(
                 "name"=self$task.name,
                 "image"=self$image,
                 "collaboration_id"=self$collaboration_id,
-                "input"=input,
+                "organizations"=organizations,
                 "description"=""
             )
+
+            # paste(rep('-', 60), sep='', collapse='')
+            # print(task)
+            # paste(rep('-', 60), sep='', collapse='')
 
             # Create the task on the server; this returs the task with its id
             r <- self$POST('/task', task)
