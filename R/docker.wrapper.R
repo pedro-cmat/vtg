@@ -22,7 +22,7 @@ docker.wrapper <- function(pkg='') {
 
     # Read the contents of file input.txt into 'input_data'
     input_file <- Sys.getenv("INPUT_FILE")
-    writeln(glue::glue("Loading data from {input_file}"))
+    writeln(glue::glue("Loading data from '{input_file}'"))
     input_data <- readChar(input_file, file.info(input_file)$size)
 
     writeln("Dispatching ...")
@@ -30,7 +30,7 @@ docker.wrapper <- function(pkg='') {
 
     # Write result to disk
     output_file <- Sys.getenv("OUTPUT_FILE")
-    writeln(glue::glue("Writing data from {output_file}"))
+    writeln(glue::glue("Writing data to '{output_file}'"))
 
     write(result, output_file)
 

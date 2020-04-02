@@ -125,14 +125,15 @@ Client <- R6::R6Class(
             self$collaboration_id <- collaboration_id
             self$collaboration <- self$getCollaboration(collaboration_id)
 
-            for (org in self$collaboration$organizations) {
+            for (orgnr in 1:length(self$collaboration$organizations)) {
+                org <- self$collaboration$organizations[[orgnr]]
                 organization <- httr::content(self$GET(org$link, prefix.api.path=F))
 
                 # Decode the base64-encoded public key
                 decoded <- base64enc::base64decode(organization$public_key)
                 organization$public_key <- rawToChar(decoded)
 
-                self$collaboration$organizations[[org$id]] <- organization
+                self$collaboration$organizations[[orgnr]] <- organization
             }
         },
 
@@ -241,7 +242,6 @@ Client <- R6::R6Class(
                     width=60
                 )
             }
-
 
             while(TRUE) {
                 r <- self$GET(path)
