@@ -23,7 +23,8 @@ docker.wrapper <- function(pkg='') {
     # Read the contents of file input.txt into 'input_data'
     input_file <- Sys.getenv("INPUT_FILE")
     writeln(glue::glue("Loading data from '{input_file}'"))
-    input_data <- readChar(input_file, file.info(input_file)$size)
+    # input_data <- readChar(input_file, file.info(input_file)$size)
+    input_data = readRDS(input_file)
 
     writeln("Dispatching ...")
     result <- dispatch.RPC(df, input_data, pkg=pkg)
@@ -32,7 +33,8 @@ docker.wrapper <- function(pkg='') {
     output_file <- Sys.getenv("OUTPUT_FILE")
     writeln(glue::glue("Writing data to '{output_file}'"))
 
-    write(result, output_file)
+    # write(result, output_file)
+    saveRDS(result, output_file)
 
     writeln("")
     writeln("[DONE!]")

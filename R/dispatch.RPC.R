@@ -8,11 +8,12 @@
 dispatch.RPC <- function(df, input, pkg='') {
     # Determine which method was requested and combine arguments and keyword
     # arguments in a single variable
-    input <- rjson::fromJSON(input)
-    method <- sprintf("RPC_%s", input$method)
 
-    input$args <- readRDS(textConnection(input$args))
-    input$kwargs <- readRDS(textConnection(input$kwargs))
+    # input <- rjson::fromJSON(input)
+    method <- sprintf("RPC_%s", input$method)
+    #
+    # input$args <- readRDS(textConnection(input$args))
+    # input$kwargs <- readRDS(textConnection(input$kwargs))
 
     args <- c(list(df), input$args, input$kwargs)
 
@@ -35,12 +36,12 @@ dispatch.RPC <- function(df, input, pkg='') {
     })
 
     # Serialize the result
-    writeln("Serializing result")
-    fp <- textConnection("result_data", open="w")
-    saveRDS(result, fp, ascii=T)
-    close(fp)
-    result <- result_data
-    writeln("Serializing complete")
+    # writeln("Serializing result")
+    # fp <- textConnection("result_data", open="w")
+    # saveRDS(result, fp, ascii=T)
+    # close(fp)
+    # result <- result_data
+    # writeln("Serializing complete")
 
     return(result)
 }

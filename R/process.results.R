@@ -7,7 +7,15 @@ process.results = function(site_results) {
         # The RDS encoded result is a list, with *one* of two keys:
         #  - result
         #  - error
-        results[[k]] <- readRDS(textConnection(site_results[[k]]$result))
+
+        results[[k]] <- tryCatch({
+
+
+            readRDS(textConnection(site_results[[k]]$result))
+        }, error = function(e) {
+            writeln("could not read results:")
+            writeln(site_results[[k]])
+        })
 
         if ("error" %in% names(results[[k]]))  {
             node <- site_results[[k]]$node

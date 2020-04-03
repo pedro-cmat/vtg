@@ -17,6 +17,9 @@ Client <- R6::R6Class(
 
         image = NULL,
         task.name = NULL,
+        using_encryption = NULL,
+        privkey = NULL,
+        SEPARATOR = "$",
 
         log = NULL,
 
@@ -75,6 +78,10 @@ Client <- R6::R6Class(
             return("OK")
         },
 
+        setPrivateKey = function(bytes_or_filename) {
+            self$privkey <- openssl::read_pem(bytes_or_filename)[["RSA PRIVATE KEY"]]
+        },
+
         getVersion = function() {
             if (is.null(self$version)) {
                 self$version <- httr::content(self$GET('/version'))$version
@@ -124,6 +131,7 @@ Client <- R6::R6Class(
         setCollaborationId = function(collaboration_id) {
             self$collaboration_id <- collaboration_id
             self$collaboration <- self$getCollaboration(collaboration_id)
+            self$using_encryption <- self$collaboration$encrypted
 
             for (orgnr in 1:length(self$collaboration$organizations)) {
                 org <- self$collaboration$organizations[[orgnr]]
@@ -155,7 +163,7 @@ Client <- R6::R6Class(
             # Apparently we were succesful. Retrieve the details from the server
             # response, which includes the key "access_token".
             response_data <- httr::content(r)
-            # list2env(response_data, env)
+            self$access_token <- response_data$access_token
 
             return("OK")
         },
@@ -275,6 +283,79 @@ Client <- R6::R6Class(
             return(httr::content(r))
         },
 
+        process.results = function(site_results) {
+            results <- list()
+            errors <- c()
+
+            num.results <- length(site_results)
+            vtg::log$info(glue::glue("Received {num.results} results."))
+
+            for (k in 1:length(site_results)) {
+                vtg::log$trace(paste('  Reading results for site', k))
+
+                marshalled.result <- tryCatch({
+                    serialized.output <- site_results[[k]]$result
+
+                    if (self$using_encryption) {
+                        # Retrieve the components key, iv and msg from the string
+                        parts <- unlist(strsplit(serialized.output, self$SEPARATOR, fixed=T))
+
+                        encrypted.key <- openssl::base64_decode(parts[1])
+                        iv <- openssl::base64_decode(parts[2])
+                        encrypted.msg <- openssl::base64_decode(parts[3])
+
+                        # Decrypt the encrypted key
+                        key <- openssl::rsa_decrypt(encrypted.key, self$privkey)
+
+                        # Use the shared key and iv to decrypt the payload
+                        serialized.output <- openssl::aes_ctr_decrypt(encrypted.msg, key, iv)
+                    }
+
+                    # writeln('')
+                    # writeln(openssl::base64_encode(serialized.output, linebreaks=T))
+                    # writeln('')
+
+                    # FIXME: for some reason R plainly refuses to load RDS-data through
+                    #   unserialize or a rawConnection. I'm baffled ...
+                    tmp <- tempfile()
+                    writeBin(serialized.output, tmp)
+                    marshalled.result <- readRDS(tmp)
+                    file.remove(tmp)
+
+                    # This has to be the last statement, otherwise things will break :@.
+                    marshalled.result
+
+                }, error = function(e) {
+                    writeln("could not read results:")
+                    writeln('')
+                    print(site_results[[k]])
+                    writeln('')
+                    writeln(e)
+                })
+
+
+                if ("error" %in% names(marshalled.result))  {
+                    writeln('Shoot :@')
+                    node <- site_results[[k]]$node
+                    error <- marshalled.result$error
+                    msg <- sprintf("Node '%s' returned an error: '%s'", node, error)
+
+                    writeln(msg)
+                    errors <- c(errors, msg)
+
+                } else {
+                    results[[k]] <- marshalled.result[["result"]]
+                }
+            }
+
+            if (length(errors)) {
+                stop(paste(errors, collapse='\n  '))
+            }
+
+            return(results)
+        },
+
+
         set.task.image = function(image, task.name='') {
             self$image <- image
             self$task.name <- task.name
@@ -300,12 +381,47 @@ Client <- R6::R6Class(
             # self$log$info("calling %s", method)
 
             # Create the json structure for the call to the server
-            input <- create.task.input(method, ...)
+            if (self$using_encryption) {
+                # Create a list where keys 'args' and 'kwargs' are *not* serialized through
+                # saveRDS(). This makes it possible to serialize & encrypt the *entire* list.
+                input <- create.task.input.unserialized(method, ...)
+                serialized.input <- serialize(input, NULL)
+
+                # FIXME: this should be a random string
+                # FIXME: create a key for each recipient
+                passphrase <- charToRaw("This is super secret")
+                key <- openssl::sha256(passphrase)
+
+                encrypted.msg <- openssl::aes_ctr_encrypt(serialized.input, key=key)
+                iv <- attr(encrypted.msg, "iv")
+
+                iv <- openssl::base64_encode(iv)
+                encrypted.msg <- openssl::base64_encode(encrypted.msg)
+                input = paste(iv, encrypted.msg, sep=self$SEPARATOR)
+
+            } else {
+                # Create a list where keys 'args' and 'kwargs' are serialized to ASCII through
+                # saveRDS(), making it JSON-safe.
+                input <- create.task.input(method, ...)
+            }
+
             organizations <- c()
 
             for (i in 1:length(self$collaboration$organizations)) {
                 org <- self$collaboration$organizations[[i]]
-                organizations[[i]] <- list(id=org$id, input=input)
+
+                if (self$using_encryption) {
+                    pubkey = openssl::read_pem(org$public_key)[['PUBLIC KEY']]
+                    encrypted.key <- openssl::rsa_encrypt(key, pubkey)
+                    encrypted.key = openssl::base64_encode(encrypted.key)
+                    encrypted.input <- paste(encrypted.key, input, sep=self$SEPARATOR)
+
+                    # writeln(paste(rep('*', 80), sep='', collapse=''))
+                    # writeln(encrypted.input)
+                    # writeln(paste(rep('*', 80), sep='', collapse=''))
+                }
+
+                organizations[[i]] <- list(id=org$id, input=encrypted.input)
             }
 
             task = list(
@@ -316,15 +432,12 @@ Client <- R6::R6Class(
                 "description"=""
             )
 
-            # paste(rep('-', 60), sep='', collapse='')
-            # print(task)
-            # paste(rep('-', 60), sep='', collapse='')
-
             # Create the task on the server; this returs the task with its id
             r <- self$POST('/task', task)
             task <- httr::content(r)
 
             vtg::log$info(sprintf('Task has been assigned id %i', task$id))
+            vtg::log$info(sprintf(' run id %i', task$id))
 
             # Wait for the results to come in
             task <- self$wait.for.results(task)
@@ -341,7 +454,7 @@ Client <- R6::R6Class(
             # for each site. The site's actual result is contained in the
             # named list member 'result' and is encoded using saveRDS.
             site_results <- task$results
-            return(process.results(site_results))
+            return(self$process.results(site_results))
         },
 
         # Return a string representation of this Client
