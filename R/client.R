@@ -317,10 +317,11 @@ Client <- R6::R6Class(
 
                     # FIXME: for some reason R plainly refuses to load RDS-data through
                     #   unserialize or a rawConnection. I'm baffled ...
-                    tmp <- tempfile()
-                    writeBin(serialized.output, tmp)
-                    marshalled.result <- readRDS(tmp)
-                    file.remove(tmp)
+                    # tmp <- tempfile()
+                    # writeBin(serialized.output, tmp)
+                    # marshalled.result <- readRDS(tmp)
+                    # file.remove(tmp)
+                    marshalled.result <- unserialize(serialized.output)
 
                     # This has to be the last statement, otherwise things will break :@.
                     marshalled.result
