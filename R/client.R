@@ -309,11 +309,14 @@ Client <- R6::R6Class(
 
                         # Use the shared key and iv to decrypt the payload
                         serialized.output <- openssl::aes_ctr_decrypt(encrypted.msg, key, iv)
+
+                    } else {
+                        serialized.output <- openssl::base64_decode(serialized.output)
                     }
 
-                    # writeln('')
+                    # writeln('---------------------------------------------------------------')
                     # writeln(openssl::base64_encode(serialized.output, linebreaks=T))
-                    # writeln('')
+                    # writeln('---------------------------------------------------------------')
 
                     # FIXME: for some reason R plainly refuses to load RDS-data through
                     #   unserialize or a rawConnection. I'm baffled ...
@@ -381,12 +384,11 @@ Client <- R6::R6Class(
         call = function(method, ...) {
             # self$log$info("calling %s", method)
 
+            input <- create.task.input.unserialized(method, ...)
+            serialized.input <- serialize(input, NULL)
+
             # Create the json structure for the call to the server
             if (self$using_encryption) {
-                # Create a list where keys 'args' and 'kwargs' are *not* serialized through
-                # saveRDS(). This makes it possible to serialize & encrypt the *entire* list.
-                input <- create.task.input.unserialized(method, ...)
-                serialized.input <- serialize(input, NULL)
 
                 # FIXME: this should be a random string
                 # FIXME: create a key for each recipient
@@ -401,9 +403,7 @@ Client <- R6::R6Class(
                 input = paste(iv, encrypted.msg, sep=self$SEPARATOR)
 
             } else {
-                # Create a list where keys 'args' and 'kwargs' are serialized to ASCII through
-                # saveRDS(), making it JSON-safe.
-                input <- create.task.input(method, ...)
+                input <- openssl::base64_encode(serialized.input)
             }
 
             organizations <- c()
@@ -416,13 +416,10 @@ Client <- R6::R6Class(
                     encrypted.key <- openssl::rsa_encrypt(key, pubkey)
                     encrypted.key = openssl::base64_encode(encrypted.key)
                     encrypted.input <- paste(encrypted.key, input, sep=self$SEPARATOR)
-
-                    # writeln(paste(rep('*', 80), sep='', collapse=''))
-                    # writeln(encrypted.input)
-                    # writeln(paste(rep('*', 80), sep='', collapse=''))
+                    input <- encrypted.input
                 }
 
-                organizations[[i]] <- list(id=org$id, input=encrypted.input)
+                organizations[[i]] <- list(id=org$id, input=input)
             }
 
             task = list(
