@@ -17,7 +17,8 @@ Client <- R6::R6Class(
 
         image = NULL,
         task.name = NULL,
-        using_encryption = NULL,
+        use.master.container = F,
+        using_encryption = F,
         privkey = NULL,
         SEPARATOR = "$",
 
@@ -103,7 +104,7 @@ Client <- R6::R6Class(
             for (collab in organization$collaborations) {
                 # self$log$debug(glue::glue('Processing collaboration {collab$id}'))
                 collaboration_id <- as.character(collab$id)
-
+                endpoint <- glue::glue('/collaboration/{collaboration_id}')
                 collaboration <- httr::content(self$GET(collab$link, prefix.api.path=F))
                 collaborations[[collaboration_id]] <- collaboration$name
             }
@@ -135,7 +136,8 @@ Client <- R6::R6Class(
 
             for (orgnr in 1:length(self$collaboration$organizations)) {
                 org <- self$collaboration$organizations[[orgnr]]
-                organization <- httr::content(self$GET(org$link, prefix.api.path=F))
+                endpoint <- glue::glue('/organization/{org$id}')
+                organization <- httr::content(self$GET(endpoint, prefix.api.path=F))
 
                 # Decode the base64-encoded public key
                 decoded <- base64enc::base64decode(organization$public_key)
@@ -143,6 +145,10 @@ Client <- R6::R6Class(
 
                 self$collaboration$organizations[[orgnr]] <- organization
             }
+        },
+
+        setUseMasterContainer = function(flag=T) {
+            self$use.master.container = flag
         },
 
         # Refresh the access token using the refresh token
@@ -365,7 +371,7 @@ Client <- R6::R6Class(
             self$task.name <- task.name
         },
 
-        # Execute a method on the distributed learning infrastructure.
+        # Execute a method on the federated infrastructure.
         #
         # This entails ...
         #  * creating a task and letting the hubs execute the method
@@ -384,12 +390,11 @@ Client <- R6::R6Class(
         call = function(method, ...) {
             # self$log$info("calling %s", method)
 
-            input <- create.task.input.unserialized(method, ...)
+            input <- create.task.input.unserialized(self$use.master.container, method, ...)
             serialized.input <- serialize(input, NULL)
 
             # Create the json structure for the call to the server
             if (self$using_encryption) {
-
                 # FIXME: this should be a random string
                 # FIXME: create a key for each recipient
                 passphrase <- charToRaw("This is super secret")
@@ -425,6 +430,7 @@ Client <- R6::R6Class(
             task = list(
                 "name"=self$task.name,
                 "image"=self$image,
+                "master"=self$use.master.container,
                 "collaboration_id"=self$collaboration_id,
                 "organizations"=organizations,
                 "description"=""

@@ -26,8 +26,13 @@ docker.wrapper <- function(pkg='') {
     # input_data <- readChar(input_file, file.info(input_file)$size)
     input_data = readRDS(input_file)
 
+    # Read the contents of file input.txt into 'input_data'
+    token_file <- Sys.getenv("TOKEN_FILE")
+    writeln(glue::glue("Loading token from '{token_file}'"))
+    token <- readChar(token_file, file.info(token_file)$size)
+
     writeln("Dispatching ...")
-    result <- dispatch.RPC(df, input_data, pkg=pkg)
+    result <- dispatch.RPC(df, input_data, pkg=pkg, token=token)
 
     # Write result to disk
     output_file <- Sys.getenv("OUTPUT_FILE")
