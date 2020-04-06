@@ -38,8 +38,6 @@ docker.wrapper <- function(pkg='') {
     output_file <- Sys.getenv("OUTPUT_FILE")
     writeln(glue::glue("Writing data to '{output_file}'"))
 
-    # write(result, output_file)
-    # saveRDS(result, output_file)
     writeBin(serialize(result, NULL), output_file)
 
     writeln("")

@@ -132,7 +132,7 @@ Client <- R6::R6Class(
         setCollaborationId = function(collaboration_id) {
             self$collaboration_id <- collaboration_id
             self$collaboration <- self$getCollaboration(collaboration_id)
-            self$using_encryption <- self$collaboration$encrypted
+             self$setUseEncryption(self$collaboration$encrypted)
 
             for (orgnr in 1:length(self$collaboration$organizations)) {
                 org <- self$collaboration$organizations[[orgnr]]
@@ -145,6 +145,10 @@ Client <- R6::R6Class(
 
                 self$collaboration$organizations[[orgnr]] <- organization
             }
+        },
+
+        setUseEncryption = function(flag) {
+            self$using_encryption <- flag
         },
 
         setUseMasterContainer = function(flag=T) {
@@ -283,10 +287,24 @@ Client <- R6::R6Class(
                 writeln('')
             }
 
-            path = sprintf('/task/%s?include=results', task$id)
+            path = sprintf('/task/%s/result', task$id)
             r <- self$GET(path)
 
             return(httr::content(r))
+        },
+
+        decrypt.result = function(serialized.output) {
+            parts <- unlist(strsplit(serialized.output, self$SEPARATOR, fixed=T))
+
+            encrypted.key <- openssl::base64_decode(parts[1])
+            iv <- openssl::base64_decode(parts[2])
+            encrypted.msg <- openssl::base64_decode(parts[3])
+
+            # Decrypt the encrypted key
+            key <- openssl::rsa_decrypt(encrypted.key, self$privkey)
+
+            # Use the shared key and iv to decrypt the payload
+            serialized.output <- openssl::aes_ctr_decrypt(encrypted.msg, key, iv)
         },
 
         process.results = function(site_results) {
@@ -303,6 +321,7 @@ Client <- R6::R6Class(
                     serialized.output <- site_results[[k]]$result
 
                     if (self$using_encryption) {
+                        writeln('Decrypting result')
                         # Retrieve the components key, iv and msg from the string
                         parts <- unlist(strsplit(serialized.output, self$SEPARATOR, fixed=T))
 
@@ -317,6 +336,7 @@ Client <- R6::R6Class(
                         serialized.output <- openssl::aes_ctr_decrypt(encrypted.msg, key, iv)
 
                     } else {
+                        writeln('Decoding base64 encoded result')
                         serialized.output <- openssl::base64_decode(serialized.output)
                     }
 
@@ -337,7 +357,7 @@ Client <- R6::R6Class(
 
                 }, error = function(e) {
                     writeln("could not read results:")
-                    writeln('')
+                    writeln('Site results:')
                     print(site_results[[k]])
                     writeln('')
                     writeln(e)
@@ -364,7 +384,6 @@ Client <- R6::R6Class(
 
             return(results)
         },
-
 
         set.task.image = function(image, task.name='') {
             self$image <- image
@@ -405,10 +424,10 @@ Client <- R6::R6Class(
 
                 iv <- openssl::base64_encode(iv)
                 encrypted.msg <- openssl::base64_encode(encrypted.msg)
-                input = paste(iv, encrypted.msg, sep=self$SEPARATOR)
+                encoded.input = paste(iv, encrypted.msg, sep=self$SEPARATOR)
 
             } else {
-                input <- openssl::base64_encode(serialized.input)
+                encoded.input <- openssl::base64_encode(serialized.input)
             }
 
             organizations <- c()
@@ -420,8 +439,11 @@ Client <- R6::R6Class(
                     pubkey = openssl::read_pem(org$public_key)[['PUBLIC KEY']]
                     encrypted.key <- openssl::rsa_encrypt(key, pubkey)
                     encrypted.key = openssl::base64_encode(encrypted.key)
-                    encrypted.input <- paste(encrypted.key, input, sep=self$SEPARATOR)
+                    encrypted.input <- paste(encrypted.key, encoded.input, sep=self$SEPARATOR)
                     input <- encrypted.input
+
+                } else {
+                    input <- encoded.input
                 }
 
                 organizations[[i]] <- list(id=org$id, input=input)
@@ -444,7 +466,8 @@ Client <- R6::R6Class(
             vtg::log$info(sprintf(' run id %i', task$id))
 
             # Wait for the results to come in
-            task <- self$wait.for.results(task)
+            # task <- self$wait.for.results(task)
+            site_results <- self$wait.for.results(task)
 
             # task is a list with the following keys:
             #  - _id
@@ -457,7 +480,7 @@ Client <- R6::R6Class(
             # The entry "results" is itself a list (dict) with one entry
             # for each site. The site's actual result is contained in the
             # named list member 'result' and is encoded using saveRDS.
-            site_results <- task$results
+            # site_results <- task$results
             return(self$process.results(site_results))
         },
 

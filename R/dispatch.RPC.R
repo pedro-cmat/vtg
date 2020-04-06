@@ -11,6 +11,8 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
 
     if (input$master == T) {
         writeln('Running a *master* container')
+        writeln('Input:')
+        print(input)
 
         host <- Sys.getenv('HOST')
         port <- Sys.getenv('PORT')
@@ -36,7 +38,7 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
         args <- c(client, input$args, input$kwargs)
 
     } else {
-        writeln('Runnign a (mere) regular container.')
+        writeln('Running a (mere) regular container.')
         method <- sprintf("RPC_%s", input$method)
         args <- c(list(df), input$args, input$kwargs)
     }
@@ -55,9 +57,13 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
     }, error = function(e) {
         error_msg <- e$message
         writeln(glue::glue('ERROR encountered while calling "{method}": {error_msg}'))
+        print(e)
         return(list(error=error_msg))
 
     })
+
+    # writeln('Returning output')
+    # print(result)
 
     return(result)
 }
