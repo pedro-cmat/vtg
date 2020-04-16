@@ -16,6 +16,7 @@ Imports:
     httr,
     rjson,
     progress,
+    base64enc,
     lgr
 
 

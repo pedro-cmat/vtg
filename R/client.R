@@ -6,6 +6,7 @@ Client <- R6::R6Class(
         username = NULL,
         password = NULL,
         collaboration_id = NULL,
+        collaboration = NULL,
         api_path = NULL,
         version = NULL,
 
@@ -16,6 +17,10 @@ Client <- R6::R6Class(
 
         image = NULL,
         task.name = NULL,
+        use.master.container = F,
+        using_encryption = F,
+        privkey = NULL,
+        SEPARATOR = "$",
 
         log = NULL,
 
@@ -34,7 +39,6 @@ Client <- R6::R6Class(
 
             api_version <- self$getVersion()
             self$log$debug(glue::glue('Using API version {api_version}'))
-
         },
 
         # Methods
@@ -74,6 +78,10 @@ Client <- R6::R6Class(
             return("OK")
         },
 
+        setPrivateKey = function(bytes_or_filename) {
+            self$privkey <- openssl::read_pem(bytes_or_filename)[["RSA PRIVATE KEY"]]
+        },
+
         getVersion = function() {
             if (is.null(self$version)) {
                 self$version <- httr::content(self$GET('/version'))$version
@@ -83,18 +91,8 @@ Client <- R6::R6Class(
         },
 
         getCollaborations = function() {
-            api_version <- self$getVersion()
-            user <- httr::content(self$GET(self$user_url))
-
-            # organization <- httr::content(
-            #     self$GET(sprintf('/organization/%i', user$organization))
-            # )
-
-            if (api_version == "0.1dev2") {
-                organization_id <- user$organization
-            } else if (api_version == "0.3.0-alpha4") {
-                organization_id <- user$organization$id
-            }
+            user <- httr::content(self$GET(self$user_url, prefix.api.path=F))
+            organization_id <- user$organization$id
 
             self$log$debug(glue::glue('Using organization_id {organization_id}'))
 
@@ -105,17 +103,9 @@ Client <- R6::R6Class(
             for (collab in organization$collaborations) {
                 # self$log$debug(glue::glue('Processing collaboration {collab$id}'))
                 collaboration_id <- as.character(collab$id)
-
-                if (api_version == "0.1dev2") {
-                    # In previous versions, the list contained (relative) URLs
-                    collaboration <- httr::content(self$GET(collab))
-                    collaborations[[collaboration_id]] <- collaboration$name
-
-                } else if (api_version == "0.3.0-alpha4") {
-                    # In newer versions, the list consists of (JSON) objects
-                    collaboration <- httr::content(self$GET(collab$link))
-                    collaborations[[collaboration_id]] <- collaboration$name
-                }
+                endpoint <- glue::glue('/collaboration/{collaboration_id}')
+                collaboration <- httr::content(self$GET(collab$link, prefix.api.path=F))
+                collaborations[[collaboration_id]] <- collaboration$name
             }
 
 
@@ -132,8 +122,36 @@ Client <- R6::R6Class(
             ))
         },
 
+        getCollaboration = function(collaboration_id) {
+            return(httr::content(
+                self$GET(sprintf('/collaboration/%i', collaboration_id))
+            ))
+        },
+
         setCollaborationId = function(collaboration_id) {
             self$collaboration_id <- collaboration_id
+            self$collaboration <- self$getCollaboration(collaboration_id)
+             self$setUseEncryption(self$collaboration$encrypted)
+
+            for (orgnr in 1:length(self$collaboration$organizations)) {
+                org <- self$collaboration$organizations[[orgnr]]
+                endpoint <- glue::glue('/organization/{org$id}')
+                organization <- httr::content(self$GET(endpoint))
+
+                # Decode the base64-encoded public key
+                decoded <- base64enc::base64decode(organization$public_key)
+                organization$public_key <- rawToChar(decoded)
+
+                self$collaboration$organizations[[orgnr]] <- organization
+            }
+        },
+
+        setUseEncryption = function(flag) {
+            self$using_encryption <- flag
+        },
+
+        setUseMasterContainer = function(flag=T) {
+            self$use.master.container = flag
         },
 
         # Refresh the access token using the refresh token
@@ -142,10 +160,10 @@ Client <- R6::R6Class(
                 stop("Not authenticated!")
             }
 
-            url <- paste(env$host, env$refresh_url, sep='')
-            token <- sprintf('Bearer %s', env$refresh_token)
+            url <- paste(self$host, self$refresh_url, sep='')
+            token <- sprintf('Bearer %s', self$refresh_token)
 
-            r <- POST(url, add_headers(Authorization=token))
+            r <- httr::POST(url, httr::add_headers(Authorization=token))
 
             if (r$status_code != 200) {
                 stop("Could not refresh token!?")
@@ -154,14 +172,19 @@ Client <- R6::R6Class(
             # Apparently we were succesful. Retrieve the details from the server
             # response, which includes the key "access_token".
             response_data <- httr::content(r)
-            # list2env(response_data, env)
+            self$access_token <- response_data$access_token
 
             return("OK")
         },
 
         # Perform a request to the server
-        request = function(method, path, data=NULL, first_try=T) {
-            url <- paste(self$host, self$api_path, path, sep='')
+        request = function(method, path, data=NULL, first_try=T, prefix.api.path=T) {
+            if (prefix.api.path) {
+                url <- paste(self$host, self$api_path, path, sep='')
+            } else {
+                url <- paste(self$host, path, sep='')
+            }
+
             token <- sprintf('Bearer %s', self$access_token)
 
             self$log$trace("request:", method=method, url=url)
@@ -178,11 +201,11 @@ Client <- R6::R6Class(
             }
 
             if (r$status_code != 200) {
-                msg <- sprintf("Request unsuccesful: %s", httr::http_status(r)$message)
+                msg <- sprintf("Request to '%s' was unsuccesful: %s", url, httr::http_status(r)$message)
 
                 if (first_try) {
-                    writeln(msg)
-                    writeln("Refreshing token ... ")
+                    self$log$error(msg)
+                    self$log$warn("Refreshing token ... ")
                     self$refresh.token()
 
                     r <- self$request(method, path, data, first_try=F)
@@ -198,18 +221,18 @@ Client <- R6::R6Class(
         },
 
         # Perform a GET request to the server
-        GET = function(path) {
-            return(self$request("GET", path))
+        GET = function(path, prefix.api.path=T) {
+            return(self$request("GET", path, prefix.api.path=prefix.api.path))
         },
 
         # Perform a POST request to the server
-        POST = function(path, data=NULL) {
-            return(self$request("POST", path, data))
+        POST = function(path, data=NULL, prefix.api.path=T) {
+            return(self$request("POST", path, data, prefix.api.path=prefix.api.path))
         },
 
         # Perform a PUT request to the server
-        PUT = function(path, data=NULL) {
-            return(self$request("PUT", path, data))
+        PUT = function(path, data=NULL, prefix.api.path=T) {
+            return(self$request("PUT", path, data, prefix.api.path=prefix.api.path))
         },
 
         # Wait for the results of a distributed task and return the task,
@@ -237,7 +260,6 @@ Client <- R6::R6Class(
                 )
             }
 
-
             while(TRUE) {
                 r <- self$GET(path)
 
@@ -264,10 +286,102 @@ Client <- R6::R6Class(
                 writeln('')
             }
 
-            path = sprintf('/task/%s?include=results', task$id)
+            path = sprintf('/task/%s/result', task$id)
             r <- self$GET(path)
 
             return(httr::content(r))
+        },
+
+        decrypt.result = function(serialized.output) {
+            parts <- unlist(strsplit(serialized.output, self$SEPARATOR, fixed=T))
+
+            encrypted.key <- openssl::base64_decode(parts[1])
+            iv <- openssl::base64_decode(parts[2])
+            encrypted.msg <- openssl::base64_decode(parts[3])
+
+            # Decrypt the encrypted key
+            key <- openssl::rsa_decrypt(encrypted.key, self$privkey)
+
+            # Use the shared key and iv to decrypt the payload
+            serialized.output <- openssl::aes_ctr_decrypt(encrypted.msg, key, iv)
+        },
+
+        process.results = function(site_results) {
+            results <- list()
+            errors <- c()
+
+            num.results <- length(site_results)
+            vtg::log$info(glue::glue("Received {num.results} results."))
+
+            for (k in 1:length(site_results)) {
+                vtg::log$trace(paste('  Reading results for site', k))
+
+                marshalled.result <- tryCatch({
+                    serialized.output <- site_results[[k]]$result
+
+                    if (self$using_encryption) {
+                        self$log$debug('Decrypting result')
+                        # Retrieve the components key, iv and msg from the string
+                        parts <- unlist(strsplit(serialized.output, self$SEPARATOR, fixed=T))
+
+                        encrypted.key <- openssl::base64_decode(parts[1])
+                        iv <- openssl::base64_decode(parts[2])
+                        encrypted.msg <- openssl::base64_decode(parts[3])
+
+                        # Decrypt the encrypted key
+                        key <- openssl::rsa_decrypt(encrypted.key, self$privkey)
+
+                        # Use the shared key and iv to decrypt the payload
+                        serialized.output <- openssl::aes_ctr_decrypt(encrypted.msg, key, iv)
+
+                    } else {
+                        self$log$debug('Decoding base64 encoded result')
+                        serialized.output <- openssl::base64_decode(serialized.output)
+                    }
+
+                    # writeln('---------------------------------------------------------------')
+                    # writeln(openssl::base64_encode(serialized.output, linebreaks=T))
+                    # writeln('---------------------------------------------------------------')
+
+                    # FIXME: for some reason R plainly refuses to load RDS-data through
+                    #   unserialize or a rawConnection. I'm baffled ...
+                    # tmp <- tempfile()
+                    # writeBin(serialized.output, tmp)
+                    # marshalled.result <- readRDS(tmp)
+                    # file.remove(tmp)
+                    marshalled.result <- unserialize(serialized.output)
+
+                    # This has to be the last statement, otherwise things will break :@.
+                    marshalled.result
+
+                }, error = function(e) {
+                    self$log$error("could not read results:")
+                    self$log$error('Site results:')
+                    self$log$error(jsonlite::toJSON(site_results[[k]], pretty=T, auto_unbox=T))
+                    self$log$error('')
+                    self$log$error(e)
+                })
+
+
+                if ("error" %in% names(marshalled.result))  {
+                    self$log$error('Shoot :@')
+                    node <- site_results[[k]]$node
+                    error <- marshalled.result$error
+                    msg <- sprintf("Node '%s' returned an error: '%s'", node, error)
+
+                    self$log$error(msg)
+                    errors <- c(errors, msg)
+
+                } else {
+                    results[[k]] <- marshalled.result[["result"]]
+                }
+            }
+
+            if (length(errors)) {
+                stop(paste(errors, collapse='\n  '))
+            }
+
+            return(results)
         },
 
         set.task.image = function(image, task.name='') {
@@ -275,7 +389,7 @@ Client <- R6::R6Class(
             self$task.name <- task.name
         },
 
-        # Execute a method on the distributed learning infrastructure.
+        # Execute a method on the federated infrastructure.
         #
         # This entails ...
         #  * creating a task and letting the hubs execute the method
@@ -284,7 +398,6 @@ Client <- R6::R6Class(
         #  * deserializing each sites' result using readRDS
         #
         # Params:
-        #   client: ptmclient::Client instance.
         #   method: name of the method to call on the distributed learning
         #           infrastructure
         #   ...: (keyword) arguments to provide to method. The arguments are serialized
@@ -295,14 +408,52 @@ Client <- R6::R6Class(
         call = function(method, ...) {
             # self$log$info("calling %s", method)
 
+            input <- create.task.input.unserialized(self$use.master.container, method, ...)
+            serialized.input <- serialize(input, NULL)
+
             # Create the json structure for the call to the server
-            input <- create.task.input(method, ...)
+            if (self$using_encryption) {
+                # FIXME: this should be a random string
+                # FIXME: create a key for each recipient
+                passphrase <- charToRaw("This is super secret")
+                key <- openssl::sha256(passphrase)
+
+                encrypted.msg <- openssl::aes_ctr_encrypt(serialized.input, key=key)
+                iv <- attr(encrypted.msg, "iv")
+
+                iv <- openssl::base64_encode(iv)
+                encrypted.msg <- openssl::base64_encode(encrypted.msg)
+                encoded.input = paste(iv, encrypted.msg, sep=self$SEPARATOR)
+
+            } else {
+                encoded.input <- openssl::base64_encode(serialized.input)
+            }
+
+            organizations <- c()
+
+            for (i in 1:length(self$collaboration$organizations)) {
+                org <- self$collaboration$organizations[[i]]
+
+                if (self$using_encryption) {
+                    pubkey = openssl::read_pem(org$public_key)[['PUBLIC KEY']]
+                    encrypted.key <- openssl::rsa_encrypt(key, pubkey)
+                    encrypted.key = openssl::base64_encode(encrypted.key)
+                    encrypted.input <- paste(encrypted.key, encoded.input, sep=self$SEPARATOR)
+                    input <- encrypted.input
+
+                } else {
+                    input <- encoded.input
+                }
+
+                organizations[[i]] <- list(id=org$id, input=input)
+            }
 
             task = list(
                 "name"=self$task.name,
                 "image"=self$image,
+                "master"=self$use.master.container,
                 "collaboration_id"=self$collaboration_id,
-                "input"=input,
+                "organizations"=organizations,
                 "description"=""
             )
 
@@ -311,9 +462,11 @@ Client <- R6::R6Class(
             task <- httr::content(r)
 
             vtg::log$info(sprintf('Task has been assigned id %i', task$id))
+            vtg::log$info(sprintf(' run id %i', task$id))
 
             # Wait for the results to come in
-            task <- self$wait.for.results(task)
+            # task <- self$wait.for.results(task)
+            site_results <- self$wait.for.results(task)
 
             # task is a list with the following keys:
             #  - _id
@@ -326,8 +479,8 @@ Client <- R6::R6Class(
             # The entry "results" is itself a list (dict) with one entry
             # for each site. The site's actual result is contained in the
             # named list member 'result' and is encoded using saveRDS.
-            site_results <- task$results
-            return(process.results(site_results))
+            # site_results <- task$results
+            return(self$process.results(site_results))
         },
 
         # Return a string representation of this Client
