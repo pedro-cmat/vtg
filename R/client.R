@@ -31,14 +31,14 @@ Client <- R6::R6Class(
             self$password <- password
             self$collaboration_id <- collaboration_id
             self$api_path <- api_path
-            self$log <- lgr::get_logger("vantage/infrastructure/client")
+            self$log <- lgr::get_logger_glue("vtg/Client")
 
             url <- glue::glue('{host}{api_path}/version')
             r <- httr::GET(url)
             self$version <- httr::content(r)$version
 
             api_version <- self$getVersion()
-            self$log$debug(glue::glue('Using API version {api_version}'))
+            self$log$debug('Using API version {api_version}')
         },
 
         # Methods
@@ -406,8 +406,6 @@ Client <- R6::R6Class(
         # Return:
         #   return value of called method
         call = function(method, ...) {
-            # self$log$info("calling %s", method)
-
             input <- create.task.input.unserialized(self$use.master.container, method, ...)
             serialized.input <- serialize(input, NULL)
 

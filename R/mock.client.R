@@ -1,30 +1,36 @@
 #' Fake client
-MockClient <- function(datasets, pkgname='') {
-    env <- environment()
-    self <- list(
-        datasets = datasets,
+MockClient <- R6::R6Class(
+    "MockClient",
+    public = list(
+        # Attributes
+        datasets = NULL,
+        pkgname = NULL,
+        image = NULL,
+        task.name = NULL,
+        use.master.container = F,
+        using_encryption = F,
 
-        # Generic getter
-        get = function(name) {
-            return(get(name, env))
+        log = NULL,
+
+        # Constructor
+        initialize = function(datasets, pkgname) {
+            self$datasets <- datasets
+            self$pkgname <- pkgname
+            self$log = lgr::get_logger_glue("vtg/MockClient")
         },
 
-        # Generic setter
-        set = function(name, value) {
-            assign(name, value, env)
-        },
-
+        # Methods
         authenticate = function(username='', password='') {
             # pass ...
         },
 
-        set.task.image = function(image, task.name='') {
-            self$set('image', image)
-            self$set('task.name', task.name)
+        set.pkgname = function(pkg) {
+            self$pkgname <- pkg
         },
 
-        set.pkgname = function(pkg) {
-            self$set('pkgname', pkg)
+        set.task.image = function(image, task.name='') {
+            self$image <- image
+            self$task.name <- task.name
         },
 
         # Mock an RPC call to all sites.
@@ -40,28 +46,38 @@ MockClient <- function(datasets, pkgname='') {
         #   return value of called method
         call = function(method, ...) {
 
-            writeln(sprintf('** Mocking call to "%s" **', method))
+            self$log$debug(sprintf('** Mocking call to "{method}" **'))
             datasets <- self$datasets
-            input <- create.task.input(method, ...)
-            input <- rjson::toJSON(input)
-            pkg <- self$get('pkgname')
+            input <- create.task.input.unserialized(self$use.master.container, method, ...)
 
             # Create a list to store the responses from the individual sites
             sites <- list()
 
             # Mock calling the RPC method on each site
             for (k in 1:length(datasets)) {
+                log <- capture.output(
+                    result <- dispatch.RPC(datasets[[k]], input, pkg=self$pkgname)
+                )
+
                 sites[[k]] <- list(
-                    result = dispatch.RPC(datasets[[k]], input, pkg=pkg),
-                    log = "this was a mocked call",
+                    result = result,
+                    log = log,
                     node = sprintf("/node/%i", k)
                 )
             }
 
-            return(process.results(sites))
+            return(self$process.results(sites))
+        },
+
+        process.results = function(site_results) {
+            results <- list()
+
+            for (k in 1:length(site_results)) {
+                results[[k]] <- site_results[[k]][["result"]][["result"]]
+            }
+
+            return(results)
         }
     )
-
-    return(self)
-}
+)
 
