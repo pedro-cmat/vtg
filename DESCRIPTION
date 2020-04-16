@@ -1,11 +1,11 @@
 Package: vtg
 Type: Package
-Title: Utilities for the Vantage Federated Learning Infrastructure
 Version: 0.1.0
+Title: Utilities for the vantage6 Federated Learning Infrastructure
+Description: This package can be used with the vantage6 federated
+    learning infrastructure (see https://github.com/IKNL/vantage6).
 Author: Melle Sieswerda
 Maintainer: Melle Sieswerda <m.sieswerda@iknl.nl>
-Description: This package provides functions for communicating with
-    the infrastructure and creating algorithms that run on it.
 License: MIT
 Encoding: UTF-8
 LazyData: true

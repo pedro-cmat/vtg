@@ -15,7 +15,7 @@ setup.client <- function() {
   # Define parameters
   username <- "username@example.com"
   password <- "password"
-  host <- 'https://api-test.distributedlearning.ai'
+  host <- 'https://trolltunga.vantage6.ai'
   api_path <- ''
   
   # Create the client
@@ -28,8 +28,13 @@ setup.client <- function() {
 # Create a client
 client <- setup.client()
 
-# Get a list of all collaborations our user is 
-client$getCollaborations()
+# Get a list of available collaborations
+print( client$getCollaborations() )
+
+# Should output something like this:
+#   id     name
+# 1  1 ZEPPELIN
+# 2  2 PIPELINE
 
 # Select a collaboration
 client$setCollaborationId(1)
