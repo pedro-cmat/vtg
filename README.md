@@ -5,7 +5,7 @@ R package that supports running algorithms on the [Vantage6](https://github.com/
 ## Installation
 Run the following in the R console to install the package and its dependencies:
 ```R
-devtools::install_github('mellesies/vtg')
+devtools::install_github('IKNL/vtg')
 ```
 
 ## Example use
