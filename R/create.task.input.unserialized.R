@@ -1,11 +1,12 @@
 # Create a data structure used as input for a call to the distributed
 # learning infrastructure.
 create.task.input.unserialized = function(use.master.container, method, ...) {
+    log <- lgr::get_logger("vantage/infrastructure/client")
 
     if (use.master.container) {
-        print('Using master container!')
+        log$debug('Using master container!')
     } else {
-        print('Regular call')
+        log$debug('Regular call')
     }
 
     # Construct the input_data list from the ellipsis.
@@ -28,10 +29,8 @@ create.task.input.unserialized = function(use.master.container, method, ...) {
         kwargs=kwargs
     )
 
-    writeln('----------------------------------------------------------------------')
-    writeln('Created input:')
-    print(input_data)
-    writeln('----------------------------------------------------------------------')
+    log$debug('Created input:')
+    log$debug(jsonlite::toJSON(input_data, pretty=T, auto_unbox=T))
 
     return(input_data)
 }

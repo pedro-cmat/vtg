@@ -39,7 +39,6 @@ Client <- R6::R6Class(
 
             api_version <- self$getVersion()
             self$log$debug(glue::glue('Using API version {api_version}'))
-
         },
 
         # Methods
@@ -137,7 +136,7 @@ Client <- R6::R6Class(
             for (orgnr in 1:length(self$collaboration$organizations)) {
                 org <- self$collaboration$organizations[[orgnr]]
                 endpoint <- glue::glue('/organization/{org$id}')
-                organization <- httr::content(self$GET(endpoint, prefix.api.path=F))
+                organization <- httr::content(self$GET(endpoint))
 
                 # Decode the base64-encoded public key
                 decoded <- base64enc::base64decode(organization$public_key)
@@ -202,11 +201,11 @@ Client <- R6::R6Class(
             }
 
             if (r$status_code != 200) {
-                msg <- sprintf("Request unsuccesful: %s", httr::http_status(r)$message)
+                msg <- sprintf("Request to '%s' was unsuccesful: %s", url, httr::http_status(r)$message)
 
                 if (first_try) {
-                    writeln(msg)
-                    writeln("Refreshing token ... ")
+                    self$log$error(msg)
+                    self$log$warn("Refreshing token ... ")
                     self$refresh.token()
 
                     r <- self$request(method, path, data, first_try=F)
@@ -321,7 +320,7 @@ Client <- R6::R6Class(
                     serialized.output <- site_results[[k]]$result
 
                     if (self$using_encryption) {
-                        writeln('Decrypting result')
+                        self$log$debug('Decrypting result')
                         # Retrieve the components key, iv and msg from the string
                         parts <- unlist(strsplit(serialized.output, self$SEPARATOR, fixed=T))
 
@@ -336,7 +335,7 @@ Client <- R6::R6Class(
                         serialized.output <- openssl::aes_ctr_decrypt(encrypted.msg, key, iv)
 
                     } else {
-                        writeln('Decoding base64 encoded result')
+                        self$log$debug('Decoding base64 encoded result')
                         serialized.output <- openssl::base64_decode(serialized.output)
                     }
 
@@ -356,21 +355,21 @@ Client <- R6::R6Class(
                     marshalled.result
 
                 }, error = function(e) {
-                    writeln("could not read results:")
-                    writeln('Site results:')
-                    print(site_results[[k]])
-                    writeln('')
-                    writeln(e)
+                    self$log$error("could not read results:")
+                    self$log$error('Site results:')
+                    self$log$error(jsonlite::toJSON(site_results[[k]], pretty=T, auto_unbox=T))
+                    self$log$error('')
+                    self$log$error(e)
                 })
 
 
                 if ("error" %in% names(marshalled.result))  {
-                    writeln('Shoot :@')
+                    self$log$error('Shoot :@')
                     node <- site_results[[k]]$node
                     error <- marshalled.result$error
                     msg <- sprintf("Node '%s' returned an error: '%s'", node, error)
 
-                    writeln(msg)
+                    self$log$error(msg)
                     errors <- c(errors, msg)
 
                 } else {
