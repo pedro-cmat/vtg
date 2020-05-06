@@ -29,8 +29,8 @@ create.task.input.unserialized = function(use.master.container, method, ...) {
         kwargs=kwargs
     )
 
-    log$debug('Created input:')
-    log$debug(jsonlite::toJSON(input_data, pretty=T, auto_unbox=T))
+    # log$debug('Created input:')
+    # log$debug(jsonlite::toJSON(input_data, pretty=T, auto_unbox=T))
 
     return(input_data)
 }
