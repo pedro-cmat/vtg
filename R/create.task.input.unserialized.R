@@ -24,6 +24,7 @@ create.task.input.unserialized = function(use.master.container, method, ...) {
     # Create the data structure
     input_data <- list(
         master=use.master.container,
+        debug=get.option('debug.master.container'),
         method=method,
         args=args,
         kwargs=kwargs

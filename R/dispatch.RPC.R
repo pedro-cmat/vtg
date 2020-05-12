@@ -14,6 +14,10 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
         writeln('Input:')
         print(input)
 
+        if (input$debug == T) {
+            lgr::lgr$set_threshold("debug")
+        }
+
         host <- Sys.getenv('HOST')
         port <- Sys.getenv('PORT')
         api_path <- Sys.getenv('API_PATH')
@@ -21,9 +25,9 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
 
         writeln(glue::glue('host: {host}{api_path}'))
 
-        writeln("Splitting token")
+        writeln("Manually decoding JWT")
         strings <- unlist(strsplit(token, ".", fixed=TRUE))
-        print(strings)
+        # print(strings)
 
         JSON <- rawToChar(base64enc::base64decode(strings[2]))
         jwt <- rjson::fromJSON(JSON)
@@ -31,7 +35,7 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
 
         writeln(glue::glue('Working with collaboration_id <{collaboration_id}>'))
 
-        client <- vtg::ContainerClient$new(host, token, api_path=api_path)
+        client <- ContainerClient$new(host, token, api_path=api_path)
         client$setCollaborationId(collaboration_id)
 
         method <- input$method
@@ -57,7 +61,9 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
     }, error = function(e) {
         error_msg <- e$message
         writeln(glue::glue('ERROR encountered while calling "{method}": {error_msg}'))
+        print(e$call)
         print(e)
+
         return(list(error=error_msg))
 
     })

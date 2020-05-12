@@ -9,8 +9,10 @@
     msg <- readChar(fileName, file.info(fileName)$size)
     packageStartupMessage(msg)
 
-    log <- lgr::get_logger("vantage/infrastructure")
+    log <- lgr::get_logger_glue("vantage/infrastructure")
     assign("log", log, envir=parent.env(environment()))
+
+    set.option("debug.master.container", FALSE)
 }
 
 .onAttach <- function(libname, pkgname) {
@@ -20,3 +22,12 @@
     # writeln()
 }
 
+options <- new.env()
+
+set.option <- function(name, value) {
+    assign(name, value, envir=options)
+}
+
+get.option <- function(name) {
+    return(get(name, envir=options))
+}

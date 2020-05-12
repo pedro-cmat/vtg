@@ -311,10 +311,11 @@ Client <- R6::R6Class(
             errors <- c()
 
             num.results <- length(site_results)
-            vtg::log$info(glue::glue("Received {num.results} results."))
+            vtg::log$info("Received {num.results} results.")
 
             for (k in 1:length(site_results)) {
-                vtg::log$trace(paste('  Reading results for site', k))
+                self$log$debug('Processing result for site {k} (organization_id={site_results[[k]]$organization})')
+                self$log$debug(paste("Log:\n", site_results[[k]]$log, sep="", collapse=""))
 
                 marshalled.result <- tryCatch({
                     serialized.output <- site_results[[k]]$result
@@ -339,16 +340,6 @@ Client <- R6::R6Class(
                         serialized.output <- openssl::base64_decode(serialized.output)
                     }
 
-                    # writeln('---------------------------------------------------------------')
-                    # writeln(openssl::base64_encode(serialized.output, linebreaks=T))
-                    # writeln('---------------------------------------------------------------')
-
-                    # FIXME: for some reason R plainly refuses to load RDS-data through
-                    #   unserialize or a rawConnection. I'm baffled ...
-                    # tmp <- tempfile()
-                    # writeBin(serialized.output, tmp)
-                    # marshalled.result <- readRDS(tmp)
-                    # file.remove(tmp)
                     marshalled.result <- unserialize(serialized.output)
 
                     # This has to be the last statement, otherwise things will break :@.
@@ -478,6 +469,10 @@ Client <- R6::R6Class(
             # for each site. The site's actual result is contained in the
             # named list member 'result' and is encoded using saveRDS.
             # site_results <- task$results
+            if (self$use.master.container) {
+                return(self$process.results(site_results)[[1]])
+            }
+
             return(self$process.results(site_results))
         },
 

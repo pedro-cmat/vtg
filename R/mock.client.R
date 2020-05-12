@@ -54,10 +54,14 @@ MockClient <- R6::R6Class(
             sites <- list()
 
             # Mock calling the RPC method on each site
+            self$log$debug("there are {length(datasets)} datasets .. ")
             for (k in 1:length(datasets)) {
                 log <- capture.output(
                     result <- dispatch.RPC(datasets[[k]], input, pkg=self$pkgname)
                 )
+
+                self$log$debug("Log for site {k}:")
+                self$log$debug(paste(log, collapse="\n"))
 
                 sites[[k]] <- list(
                     result = result,
