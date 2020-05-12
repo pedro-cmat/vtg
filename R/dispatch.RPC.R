@@ -11,11 +11,21 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
 
     if (input$master == T) {
         writeln('Running a *master* container')
-        writeln('Input:')
-        print(input)
 
         if (input$debug == T) {
             lgr::lgr$set_threshold("debug")
+
+            lgr::lgr$appenders$console$set_layout(
+                lgr::LayoutFormat$new(
+                    fmt="%t - %L (master container - %c): %m",
+                    timestamp_fmt="%H:%M:%S",
+                    colors=getOption("lgr.colors"),
+                    pad_levels="right"
+                )
+            )
+
+            writeln('Input:')
+            print(input)
         }
 
         host <- Sys.getenv('HOST')
@@ -31,7 +41,24 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
 
         JSON <- rawToChar(base64enc::base64decode(strings[2]))
         jwt <- rjson::fromJSON(JSON)
+
         collaboration_id <- jwt$identity$collaboration_id
+
+        if (input$debug & pkg != '') {
+            tryCatch({
+                writeln('JWT contents:')
+                print(jwt)
+                writeln('')
+
+                image.name <- jwt$identity$image
+                set.image.cmd <- glue::glue("{pkg}::set.option('image.name', '{image.name}')")
+                print(glue::glue('Setting image name: "{set.image.cmd}"'))
+                eval(parse(text=set.image.cmd))
+
+            }, error=function(e) {
+                writeln(glue::glue('ERROR: Could not set image name: "{e}"'))
+            })
+        }
 
         writeln(glue::glue('Working with collaboration_id <{collaboration_id}>'))
 
