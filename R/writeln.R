@@ -3,6 +3,7 @@
 #' @param ... Strings to write to STDOUT
 #' @param sep Separator to use between strings. Defaults to a single space
 #' @export
+#'
 #' @examples
 #' writeln("Hello, world!")
 writeln <- function(..., sep=" ") {

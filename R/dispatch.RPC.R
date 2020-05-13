@@ -1,13 +1,20 @@
 #' Dispatch a remote procedure call.
 #'
-#' @param df data frame containing the *local* dataset
-#' @param input string containing serialized JSON; JSON should contain
-#'              the keys `method`, `args` and `kwargs`.
+#' This method is called by [docker.wrapper()], supplying `df`, `input` and
+#' `pkg`. Token will be supplied only when running within a master container.
+#'
+#' @param df [data.frame()] containing the *local* dataset
+#' @param input [list()] with at least the keys `method`, `args` and `kwargs`.
+#'              Key `debug` ([logical()]) is optional.
 #'
 #' @return Output depends on RPC call.
 dispatch.RPC <- function(df, input, pkg='', token='') {
     # Determine which method was requested and combine arguments and keyword
     # arguments in a single variable
+
+    if (is.null(input[['debug']])) {
+        input[['debug']] = F
+    }
 
     if (input$master == T) {
         writeln('Running a *master* container')

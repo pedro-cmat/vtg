@@ -1,3 +1,22 @@
+#' @docType class
+#' @title Client for the vantage6 infrastructure.
+#' @name Client
+#'
+#' @description
+#' Facilitates querying collaborations, creating tasks and retrieving
+#' results.
+#'
+#' @examples
+#' client <- vtg::Client$new('http://localhost:5000', api_path='/api')
+#' client$authenticate('root', 'password')
+#'
+#' collaborations <- client$getCollaborations()
+#' print(collaborations)
+#'
+#' client$set.task.image(image.name, task.name="colnames")
+#' result <- client$call("colnames")
+#'
+#'
 Client <- R6::R6Class(
     "Client",
     public = list(
@@ -24,7 +43,11 @@ Client <- R6::R6Class(
 
         log = NULL,
 
-        # Constructor
+        #' @param host [character()] Host to connect to
+        #' @param username [character()] (optional) Username
+        #' @param password [character()] (optional) Password
+        #' @param collaboration_id [integer()] (optional) Collaboration id
+        #' @param api_path [character()] (optional) API path
         initialize = function(host, username='', password='', collaboration_id=NULL, api_path='') {
             self$host <- host
             self$username <- username
@@ -38,10 +61,13 @@ Client <- R6::R6Class(
             self$version <- httr::content(r)$version
 
             api_version <- self$getVersion()
-            self$log$debug('Using API version {api_version}')
+            self$log$debug('Using API version: {api_version}')
         },
 
-        # Methods
+        #' @param username character (optional) Username. If not provided, the
+        #'   username and password provided to the constructor are used.
+        #' @param password character (optional) Password. Required if username
+        #'   is provided.
         authenticate = function(username='', password='') {
             # Create the URL and data for the JSON body
             # url <- paste(env$host, env$api_path, '/token', sep='')
@@ -56,9 +82,6 @@ Client <- R6::R6Class(
                 username=self$username,
                 password=self$password
             )
-
-            # self$log$debug("authenticate:", username=username, url=url)
-            # print(self$log)
 
             r <- httr::POST(url, body=data, encode="json")
 
@@ -380,6 +403,41 @@ Client <- R6::R6Class(
             self$task.name <- task.name
         },
 
+        # Encrypt data using an organization's public key.
+        #
+        # Returns a string containing 3 base64 encoded components, separated by
+        # a '$':
+        #   1. (RSA) encrypted key,
+        #   2. initialization vector (iv),
+        #   3. (AES) encrypted body
+        encrypt = function(data, org) {
+            # Generate a shared key (for use with AES)
+            passphrase <- openssl::rand_bytes(32)
+            key <- openssl::sha256(passphrase)
+
+            # Encrypt the input using AES (symmetric encryption). This returns
+            # an encrypted 'message' and an initialization vector (iv).
+            encrypted.msg <- openssl::aes_ctr_encrypt(data, key=key)
+            iv <- attr(encrypted.msg, "iv")
+
+            # Base64 encode the initialization vector and message individually.
+            # Combine them into a single string, separated by a '$'.
+            iv <- openssl::base64_encode(iv)
+            encrypted.msg <- openssl::base64_encode(encrypted.msg)
+            encoded.input = paste(iv, encrypted.msg, sep=self$SEPARATOR)
+
+            # Encrypt the shared key with the organization's public key (using RSA)
+            pubkey = openssl::read_pem(org$public_key)[['PUBLIC KEY']]
+            encrypted.key <- openssl::rsa_encrypt(key, pubkey)
+
+            # Base64 encode the RSA encrypted key and prepend it to the previously
+            # encrypted body.
+            encrypted.key = openssl::base64_encode(encrypted.key)
+            encrypted.data <- paste(encrypted.key, encoded.input, sep=self$SEPARATOR)
+
+            return(encrypted.data)
+        },
+
         # Execute a method on the federated infrastructure.
         #
         # This entails ...
@@ -397,41 +455,29 @@ Client <- R6::R6Class(
         # Return:
         #   return value of called method
         call = function(method, ...) {
+            # Create a list() that can be used by dispatch.RPC()
             input <- create.task.input.unserialized(self$use.master.container, method, ...)
+
+            # Serialize the input to bytes
             serialized.input <- serialize(input, NULL)
 
-            # Create the json structure for the call to the server
-            if (self$using_encryption) {
-                # FIXME: this should be a random string
-                # FIXME: create a key for each recipient
-                passphrase <- charToRaw("This is super secret")
-                key <- openssl::sha256(passphrase)
-
-                encrypted.msg <- openssl::aes_ctr_encrypt(serialized.input, key=key)
-                iv <- attr(encrypted.msg, "iv")
-
-                iv <- openssl::base64_encode(iv)
-                encrypted.msg <- openssl::base64_encode(encrypted.msg)
-                encoded.input = paste(iv, encrypted.msg, sep=self$SEPARATOR)
-
-            } else {
-                encoded.input <- openssl::base64_encode(serialized.input)
-            }
-
+            # If we're using encryption, we'll need to encrypt the input for each organization
+            # individually (using the organization's public key).
             organizations <- c()
 
             for (i in 1:length(self$collaboration$organizations)) {
                 org <- self$collaboration$organizations[[i]]
 
                 if (self$using_encryption) {
-                    pubkey = openssl::read_pem(org$public_key)[['PUBLIC KEY']]
-                    encrypted.key <- openssl::rsa_encrypt(key, pubkey)
-                    encrypted.key = openssl::base64_encode(encrypted.key)
-                    encrypted.input <- paste(encrypted.key, encoded.input, sep=self$SEPARATOR)
-                    input <- encrypted.input
+                    # Returns a string containing 3 base64 encoded components, separated by
+                    # a '$':
+                    #   1: (RSA) encrypted key,
+                    #   2: initialization vector (iv),
+                    #   3: (AES) encrypted body
+                    input <- self$encrypt(serialized.input, org)
 
                 } else {
-                    input <- encoded.input
+                    input <- openssl::base64_encode(serialized.input)
                 }
 
                 organizations[[i]] <- list(id=org$id, input=input)
@@ -478,11 +524,9 @@ Client <- R6::R6Class(
 
         # Return a string representation of this Client
         repr = function() {
-            return(sprintf("Client(host='%s', username='%s')", env$host, env$username))
+            return(glue::glue("vtg::Client(host='{self$host}', username='{self$username}')"))
         }
     ),
 
-    private = list(
-
-    )
+    private = list()
 )

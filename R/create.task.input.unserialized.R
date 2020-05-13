@@ -1,5 +1,15 @@
-# Create a data structure used as input for a call to the distributed
-# learning infrastructure.
+#' Create a data structure that can be used as input for [dispatch.RPC()]).
+#'
+#' Creates a [base::list()] with keys `master`, `debug`, `method`, `args`
+#' and `kwargs` that can be used by [dispatch.RPC()], run on a node, to
+#' execute a remote procedure call.
+#'
+#' @param use.master.container logical Indicates whether the task should be run in a
+#'   master container.
+#' @param method Character vector (string) of the method to run.
+#' @param ... Arguments and keyword arguments
+#'
+#' @return [list()] with keys `master`, `debug`, `method`, `args`, `kwargs`
 create.task.input.unserialized = function(use.master.container, method, ...) {
     log <- lgr::get_logger("vantage/infrastructure/client")
 
@@ -24,14 +34,11 @@ create.task.input.unserialized = function(use.master.container, method, ...) {
     # Create the data structure
     input_data <- list(
         master=use.master.container,
-        debug=get.option('debug.master.container'),
+        debug=get.option('debug.container'),
         method=method,
         args=args,
         kwargs=kwargs
     )
-
-    # log$debug('Created input:')
-    # log$debug(jsonlite::toJSON(input_data, pretty=T, auto_unbox=T))
 
     return(input_data)
 }

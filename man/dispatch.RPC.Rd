@@ -4,17 +4,18 @@
 \alias{dispatch.RPC}
 \title{Dispatch a remote procedure call.}
 \usage{
-dispatch.RPC(df, input)
+dispatch.RPC(df, input, pkg = "", token = "")
 }
 \arguments{
-\item{df}{data frame containing the \emph{local} dataset}
+\item{df}{\code{\link[=data.frame]{data.frame()}} containing the \emph{local} dataset}
 
-\item{input}{string containing serialized JSON; JSON should contain
-the keys \code{method}, \code{args} and \code{kwargs}.}
+\item{input}{\code{\link[=list]{list()}} with at least the keys \code{method}, \code{args} and \code{kwargs}.
+Key \code{debug} (\code{\link[=logical]{logical()}}) is optional.}
 }
 \value{
 Output depends on RPC call.
 }
 \description{
-Dispatch a remote procedure call.
+This method is called by \code{\link[=docker.wrapper]{docker.wrapper()}}, supplying \code{df}, \code{input} and
+\code{pkg}. Token will be supplied only when running within a master container.
 }

@@ -1,4 +1,7 @@
-#' Fake client
+#' MockClient
+#'
+#' Client that mocks running an algorithm on the vantage6 infrastructure.
+#' Particularly useful for testing and developing.
 MockClient <- R6::R6Class(
     "MockClient",
     public = list(

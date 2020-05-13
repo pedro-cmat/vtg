@@ -1,15 +1,24 @@
-#' Entrypoint when excecuting this script using Rscript within a Docker container.
+#' @title docker.wrapper()
 #'
-#' This function expects the environment variable `DATABASE_URI` to be set and
-#' pointing towards a CSV file that can be read by the R-function `read.csv()`
-#' _without_ specifying format-details.
+#' @description
+#' This function is run by Docker when a `vtg`-based container is
+#' started. It handles communication (input/output) with the Node
+#' by reading/writing to files.
+#'
+#' It expects the following environment variables to be set:
+#'  * `DATABASE_URI`: filename of a CSV file that can be read by
+#'    the R-function [read.csv()]  _without_ specifying format-details.
+#'  * `INPUT_FILE`: filename that contains algorithm input in RDS format.
+#'    Input should be a [list()] as created using [create.task.input.unserialized()].
+#'  * `OUTPUT_FILE`: filename of file that's used to write results to.
+#'  * `TOKEN_FILE`: filename of file contains a JSON Web Token.
 #'
 #' Performs the following actions:
 #' * Load data from the CSV file
 #' * Loads the input parameters provided to the container in `input.txt`.
 #' * Wraps the docker input/output for `dispatch.RPC()`.
 #'
-#' (de)serialization is performed in `dispatch.RPC()` to enable testing.
+#' @param pkg [character()] with the name of the R package to dispatch to.
 #'
 #' @return `null`; output will be written to `output.txt`
 docker.wrapper <- function(pkg='') {
@@ -23,7 +32,6 @@ docker.wrapper <- function(pkg='') {
     # Read the contents of file input.txt into 'input_data'
     input_file <- Sys.getenv("INPUT_FILE")
     writeln(glue::glue("Loading data from '{input_file}'"))
-    # input_data <- readChar(input_file, file.info(input_file)$size)
     input_data = readRDS(input_file)
 
     # Read the contents of file input.txt into 'input_data'

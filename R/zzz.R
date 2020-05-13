@@ -12,7 +12,7 @@
     log <- lgr::get_logger_glue("vantage/infrastructure")
     assign("log", log, envir=parent.env(environment()))
 
-    set.option("debug.master.container", FALSE)
+    set.option("debug.container", FALSE)
 }
 
 .onAttach <- function(libname, pkgname) {

@@ -1,3 +1,6 @@
+#' @docType class
+#' @title Client for master container algorithms on the vantage6 infrastructure.
+#' @name ContainerClient
 ContainerClient <- R6::R6Class(
     "ContainerClient",
     inherit=Client,
