@@ -85,7 +85,7 @@ Client <- R6::R6Class(
 
             r <- httr::POST(url, body=data, encode="json")
 
-            if (r$status_code != 200) {
+            if (!is.element(r$status_code, c(200,201,202))) {
                 stop(sprintf("Could not authenticate: %s", httr::http_status(r)$message))
             }
 
@@ -188,7 +188,7 @@ Client <- R6::R6Class(
 
             r <- httr::POST(url, httr::add_headers(Authorization=token))
 
-            if (r$status_code != 200) {
+            if (!is.element(r$status_code, c(200,201,202))) {
                 stop("Could not refresh token!?")
             }
 
@@ -223,7 +223,7 @@ Client <- R6::R6Class(
 
             }
 
-            if (r$status_code != 200) {
+            if (!is.element(r$status_code, c(200,201,202))) {
                 msg <- sprintf("Request to '%s' was unsuccesful: %s", url, httr::http_status(r)$message)
 
                 if (first_try) {
