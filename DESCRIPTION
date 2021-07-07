@@ -17,4 +17,5 @@ Imports:
     rjson,
     progress,
     base64enc,
-    lgr
+    lgr,
+    hexView
