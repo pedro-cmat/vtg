@@ -466,9 +466,13 @@ Client <- R6::R6Class(
                 serialized.payload <- serialize(input, NULL)
             }
 
-            serialized.data_format <- stringi::stri_enc_toutf8(self$data_format)
-            serialized.dot <- stringi::stri_enc_toutf8('.')
-            serialized.input <- paste(serialized.data_format, serialized.dot, serialized.payload)
+            if (! is.null(self$data_format)) {
+                serialized.data_format <- stringi::stri_enc_toutf8(self$data_format)
+                serialized.dot <- stringi::stri_enc_toutf8('.')
+                serialized.input <- paste(serialized.data_format, serialized.dot, serialized.payload)
+            } else {
+                serialized.input <- serialized.payload
+            }
 
             # If we're using encryption, we'll need to encrypt the input for each organization
             # individually (using the organization's public key).
