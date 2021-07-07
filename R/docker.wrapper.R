@@ -67,7 +67,7 @@ read_formatted <- function(input_file){
     #' :param file: input file received from vantage6 infrastructure.
     #' :return: * input data for the algorithm.
 
-    rawbindata <- readRaw(input_file)
+    rawbindata <- hexView::readRaw(input_file)
     splitted_data <- read_data_format(rawbindata)
     data_format <- splitted_data$data_format
     dot_location <- splitted_data$dot_location
@@ -97,7 +97,7 @@ read_data_format <- function(rawbindata){
 
     data_format <- list()
     for(i in seq(MAX_FORMAT_STRING_LENGTH)){
-        char <- blockValue(rawbindata)[i]
+        char <- hexView::blockValue(rawbindata)[i]
         if( char != DATA_FORMAT_SEPARATOR){
             data_format[[i]] <- char
         } else {
@@ -120,7 +120,7 @@ read_json_data <- function(rawbindata, dot_location){
 
     data <- list()
     for(j in seq(from=(dot_location+1), to=rawbindata$nbytes)){
-        char <- blockValue(rawbindata)[j]
+        char <- hexView::blockValue(rawbindata)[j]
         data[[(j-dot_location)]] <- char
     }
     json_data <- paste(data, collapse='')

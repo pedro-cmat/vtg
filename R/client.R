@@ -459,19 +459,19 @@ Client <- R6::R6Class(
             # Create a list() that can be used by dispatch.RPC()
             input <- create.task.input.unserialized(self$use.master.container, method, ...)
 
-            # Serialize the input to bytes
-            if (tolower(self$data_format)=='json') {
-                serialized.payload <- jsonlite::serializeJSON(input)
-            } else {
-                serialized.payload <- serialize(input, NULL)
-            }
-
             if (! is.null(self$data_format)) {
+                # Serialize the input to bytes
+                if (tolower(self$data_format)=='json') {
+                    serialized.payload <- jsonlite::serializeJSON(input)
+                } else {
+                    serialized.payload <- serialize(input, NULL)
+                }
+
                 serialized.data_format <- stringi::stri_enc_toutf8(self$data_format)
                 serialized.dot <- stringi::stri_enc_toutf8('.')
                 serialized.input <- paste(serialized.data_format, serialized.dot, serialized.payload)
             } else {
-                serialized.input <- serialized.payload
+                serialized.input <- serialize(input, NULL)
             }
 
             # If we're using encryption, we'll need to encrypt the input for each organization
