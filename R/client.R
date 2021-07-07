@@ -40,6 +40,7 @@ Client <- R6::R6Class(
         using_encryption = F,
         privkey = NULL,
         SEPARATOR = "$",
+        data_format = NULL,
 
         log = NULL,
 
@@ -459,7 +460,19 @@ Client <- R6::R6Class(
             input <- create.task.input.unserialized(self$use.master.container, method, ...)
 
             # Serialize the input to bytes
-            serialized.input <- serialize(input, NULL)
+            if (tolower(self$data_format)=='json') {
+                serialized.payload <- jsonlite::serializeJSON(input)
+            } else {
+                serialized.payload <- serialize(input, NULL)
+            }
+
+            if (! is.null(self$data_format)) {
+                serialized.data_format <- stringi::stri_enc_toutf8(self$data_format)
+                serialized.dot <- stringi::stri_enc_toutf8('.')
+                serialized.input <- paste(serialized.data_format, serialized.dot, serialized.payload)
+            } else {
+                serialized.input <- serialized.payload
+            }
 
             # If we're using encryption, we'll need to encrypt the input for each organization
             # individually (using the organization's public key).
@@ -492,7 +505,7 @@ Client <- R6::R6Class(
                 "description"=""
             )
 
-            # Create the task on the server; this returs the task with its id
+            # Create the task on the server; this returns the task with its id
             r <- self$POST('/task', task)
             task <- httr::content(r)
 
@@ -508,7 +521,7 @@ Client <- R6::R6Class(
             #  - id
             #  - description
             #  - complete
-            #  - imag
+            #  - image
             #  - collaboration
             #  - results
             # The entry "results" is itself a list (dict) with one entry
