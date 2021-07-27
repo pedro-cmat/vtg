@@ -41,6 +41,7 @@ Client <- R6::R6Class(
         privkey = NULL,
         SEPARATOR = "$",
         data_format = NULL,
+        output_format = NULL,
 
         log = NULL,
 
@@ -457,7 +458,7 @@ Client <- R6::R6Class(
         #   return value of called method
         call = function(method, ...) {
             # Create a list() that can be used by dispatch.RPC()
-            input <- create.task.input.unserialized(self$use.master.container, method, ...)
+            input <- create.task.input.unserialized(self$use.master.container, method, self$output_format, ...)
 
             if (! is.null(self$data_format)) {
                 # Serialize the input to bytes
