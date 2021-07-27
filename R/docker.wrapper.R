@@ -49,7 +49,7 @@ docker.wrapper <- function(pkg='') {
     # Output serialization
     if(!is.null(input_data$output_format)){
         if(tolower(input_data$output_format) == 'json'){
-            serialized_result = jsonlite::toJSON(result)
+            serialized_result = charToRaw(jsonlite::toJSON(result, auto_unbox = TRUE))
             writeln("Serializing output to JSON.")
         }
         else{
