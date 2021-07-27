@@ -10,7 +10,7 @@
 #' @param ... Arguments and keyword arguments
 #'
 #' @return [list()] with keys `master`, `debug`, `method`, `args`, `kwargs`
-create.task.input.unserialized = function(use.master.container, method, ...) {
+create.task.input.unserialized = function(use.master.container, method, output_format, ...) {
     log <- lgr::get_logger("vantage/infrastructure/client")
 
     if (use.master.container) {
@@ -37,7 +37,8 @@ create.task.input.unserialized = function(use.master.container, method, ...) {
         debug=get.option('debug.container'),
         method=method,
         args=args,
-        kwargs=kwargs
+        kwargs=kwargs,
+        output_format=output_format
     )
 
     return(input_data)
