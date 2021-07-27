@@ -447,7 +447,7 @@ Client <- R6::R6Class(
         #  * waiting for all results to arrive
         #  * deserializing each sites' result using readRDS
         #
-        # Params:
+        # Params:to
         #   method: name of the method to call on the distributed learning
         #           infrastructure
         #   ...: (keyword) arguments to provide to method. The arguments are serialized
@@ -462,14 +462,15 @@ Client <- R6::R6Class(
             if (! is.null(self$data_format)) {
                 # Serialize the input to bytes
                 if (tolower(self$data_format)=='json') {
-                    serialized.payload <- jsonlite::serializeJSON(input)
+                    serialized.payload <- charToRaw(jsonlite::toJSON(input, auto_unbox=TRUE))
                 } else {
                     serialized.payload <- serialize(input, NULL)
                 }
 
-                serialized.data_format <- stringi::stri_enc_toutf8(self$data_format)
-                serialized.dot <- stringi::stri_enc_toutf8('.')
-                serialized.input <- paste(serialized.data_format, serialized.dot, serialized.payload)
+                serialized.data_format <- charToRaw(self$data_format)
+                serialized.dot <- charToRaw('.')
+                serialized.input <- c(serialized.data_format, serialized.dot, serialized.payload)
+
             } else {
                 serialized.input <- serialize(input, NULL)
             }

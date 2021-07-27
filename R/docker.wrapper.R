@@ -46,7 +46,18 @@ docker.wrapper <- function(pkg='') {
     output_file <- Sys.getenv("OUTPUT_FILE")
     writeln(glue::glue("Writing data to '{output_file}'"))
 
-    writeBin(serialize(result, NULL), output_file)
+    # Output serialization
+    if(input_data$output_format=='json'){
+        serialized_result = jsonlite::toJSON(result)
+        writeln("Serializing output to JSON.")
+    }
+    else{
+
+        serialized_result = serialize(result, NULL)
+        writeln("Serializing output to RDS")
+    }
+    writeBin(serialized_result, output_file)
+
 
     writeln("")
     writeln("[DONE!]")
