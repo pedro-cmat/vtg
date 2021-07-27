@@ -365,7 +365,21 @@ Client <- R6::R6Class(
                         serialized.output <- openssl::base64_decode(serialized.output)
                     }
 
-                    marshalled.result <- unserialize(serialized.output)
+
+                    if(!is.null(self$output_format)){
+                        if(tolower(self$output_format) == 'json'){
+                            marshalled.result = jsonlite::fromJSON(rawToChar(serialized.output))
+                            writeln("Unserializing to JSON.")
+                        }
+                        else{
+                            marshalled.result = unserialize(serialized.output)
+                            writeln("Unserializing to RDS")
+                        }
+                    }
+                    else{
+                        marshalled.result = unserialize(serialized.output)
+                        writeln("Unserializing to RDS")
+                    }
 
                     # This has to be the last statement, otherwise things will break :@.
                     marshalled.result
