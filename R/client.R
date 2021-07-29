@@ -41,7 +41,6 @@ Client <- R6::R6Class(
         privkey = NULL,
         SEPARATOR = "$",
         data_format = NULL,
-        output_format = NULL,
 
         log = NULL,
 
@@ -365,7 +364,7 @@ Client <- R6::R6Class(
                         serialized.output <- openssl::base64_decode(serialized.output)
                     }
 
-                    marshalled.result <- unserialize(serialized.output)
+                    marshalled.result <- load_vantage6_formatted(serialized.output)
 
                     # This has to be the last statement, otherwise things will break :@.
                     marshalled.result
@@ -458,23 +457,9 @@ Client <- R6::R6Class(
         #   return value of called method
         call = function(method, ...) {
             # Create a list() that can be used by dispatch.RPC()
-            input <- create.task.input.unserialized(self$use.master.container, method, self$output_format, ...)
+            input <- create.task.input.unserialized(self$use.master.container, method, self$data_format, ...)
 
-            if (! is.null(self$data_format)) {
-                # Serialize the input to bytes
-                if (tolower(self$data_format)=='json') {
-                    serialized.payload <- charToRaw(jsonlite::toJSON(input, auto_unbox=TRUE))
-                } else {
-                    serialized.payload <- serialize(input, NULL)
-                }
-
-                serialized.data_format <- charToRaw(self$data_format)
-                serialized.dot <- charToRaw('.')
-                serialized.input <- c(serialized.data_format, serialized.dot, serialized.payload)
-
-            } else {
-                serialized.input <- serialize(input, NULL)
-            }
+            serialized.input <- dump_vantage6_formatted(input, self$data_format)
 
             # If we're using encryption, we'll need to encrypt the input for each organization
             # individually (using the organization's public key).
