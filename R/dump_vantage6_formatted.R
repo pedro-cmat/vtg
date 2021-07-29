@@ -10,16 +10,16 @@ dump_vantage6_formatted <- function(payload, data_format){
             serialized.payload = serialize(payload, NULL)
             writeln("Serializing to RDS")
         }
+
+        serialized.data_format <- charToRaw(data_format)
+        serialized.dot <- charToRaw('.')
+        serialized.data <- c(serialized.data_format, serialized.dot, serialized.payload)
+
     }
     else{
-        serialized.payload = serialize(payload, NULL)
+        serialized.data = serialize(payload, NULL)
         writeln("Serializing to RDS")
     }
 
-    serialized.data_format <- charToRaw(data_format)
-    serialized.dot <- charToRaw('.')
-    serialized.data <- c(serialized.data_format, serialized.dot, serialized.payload)
-
     return(serialized.data)
-
 }
