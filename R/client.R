@@ -364,7 +364,14 @@ Client <- R6::R6Class(
                         serialized.output <- openssl::base64_decode(serialized.output)
                     }
 
-                    marshalled.result <- load_vantage6_formatted(serialized.output)
+                    # mimic hexview object
+                    rawBlock <- list(width=NULL, offset=0, nbytes=length(serialized.output),
+                                      fileRaw=serialized.output, fileNum=NULL,
+                                      machine="hex", type="char",
+                                      size=1, endian=.Platform$endian, signed=TRUE)
+                    class(rawBlock) <- "rawBlock"
+
+                    marshalled.result <- load_vantage6_formatted(rawBlock)
 
                     # This has to be the last statement, otherwise things will break :@.
                     marshalled.result
