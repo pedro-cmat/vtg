@@ -13,6 +13,8 @@ MockClient <- R6::R6Class(
         use.master.container = F,
         using_encryption = F,
 
+        data_format = NULL,
+
         log = NULL,
 
         # Constructor
@@ -51,7 +53,7 @@ MockClient <- R6::R6Class(
 
             self$log$debug(sprintf('** Mocking call to "{method}" **'))
             datasets <- self$datasets
-            input <- create.task.input.unserialized(self$use.master.container, method, ...)
+            input <- create.task.input.unserialized(self$use.master.container, method, self$data_format, ...)
 
             # Create a list to store the responses from the individual sites
             sites <- list()
