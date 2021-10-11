@@ -9,6 +9,11 @@ ContainerClient <- R6::R6Class(
         initialize = function(host, token, api_path) {
             super$initialize(host, api_path=api_path)
             self$access_token = token
+
+            # Extract collaboration/task information from the token
+            identity = jose::jwt_split(token)$payload$identity
+            self$setCollaborationId(identity$collaboration_id)
+            self$set.task.image(identity$image, "subtask")
         },
 
         setUseEncryption = function(flag) {
