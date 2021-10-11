@@ -42,35 +42,35 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
 
         writeln(glue::glue('host: {host}{api_path}'))
 
-        writeln("Manually decoding JWT")
-        strings <- unlist(strsplit(token, ".", fixed=TRUE))
+        # writeln("Manually decoding JWT")
+        # strings <- unlist(strsplit(token, ".", fixed=TRUE))
         # print(strings)
 
-        JSON <- rawToChar(base64enc::base64decode(strings[2]))
-        jwt <- rjson::fromJSON(JSON)
+        # JSON <- rawToChar(base64enc::base64decode(strings[2]))
+        # jwt <- rjson::fromJSON(JSON)
 
-        collaboration_id <- jwt$identity$collaboration_id
+        # collaboration_id <- jwt$identity$collaboration_id
 
-        if (input$debug & pkg != '') {
-            tryCatch({
-                writeln('JWT contents:')
-                print(jwt)
-                writeln('')
+        # if (input$debug & pkg != '') {
+        #     tryCatch({
+        #         writeln('JWT contents:')
+        #         print(jwt)
+        #         writeln('')
 
-                image.name <- jwt$identity$image
-                set.image.cmd <- glue::glue("{pkg}::set.option('image.name', '{image.name}')")
-                print(glue::glue('Setting image name: "{set.image.cmd}"'))
-                eval(parse(text=set.image.cmd))
+        #         image.name <- jwt$identity$image
+        #         set.image.cmd <- glue::glue("{pkg}::set.option('image.name', '{image.name}')")
+        #         print(glue::glue('Setting image name: "{set.image.cmd}"'))
+        #         eval(parse(text=set.image.cmd))
+        #
+        #     }, error=function(e) {
+        #         writeln(glue::glue('ERROR: Could not set image name: "{e}"'))
+        #     })
+        # }
 
-            }, error=function(e) {
-                writeln(glue::glue('ERROR: Could not set image name: "{e}"'))
-            })
-        }
-
-        writeln(glue::glue('Working with collaboration_id <{collaboration_id}>'))
+        # writeln(glue::glue('Working with collaboration_id <{collaboration_id}>'))
 
         client <- ContainerClient$new(host, token, api_path=api_path)
-        client$setCollaborationId(collaboration_id)
+        # client$setCollaborationId(collaboration_id)
 
         method <- input$method
         args <- c(client, input$args, input$kwargs)
