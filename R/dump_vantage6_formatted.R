@@ -3,7 +3,7 @@ dump_vantage6_formatted <- function(payload, data_format){
     # Output serialization
     if(!is.null(data_format)){
         if(tolower(data_format) == 'json'){
-            serialized.payload = charToRaw(jsonlite::toJSON(payload, auto_unbox = TRUE))
+            serialized.payload = charToRaw(jsonlite::toJSON(payload, auto_unbox = TRUE, force = T))
             writeln("Serializing to JSON.")
         }
         else{
