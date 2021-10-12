@@ -203,6 +203,11 @@ Client <- R6::R6Class(
 
         # Perform a request to the server
         request = function(method, path, data=NULL, first_try=T, prefix.api.path=T) {
+            self$log$debug(glue::glue("method={method}"))
+            self$log$debug(glue::glue("path={path}"))
+            self$log$debug(glue::glue("prefix_path={prefix.api.path}, api_path={self$api_path}"))
+            self$log$debug(glue::glue("host={self$host}"))
+
             if (prefix.api.path) {
                 url <- paste(self$host, self$api_path, path, sep='')
             } else {
@@ -211,7 +216,7 @@ Client <- R6::R6Class(
 
             token <- sprintf('Bearer %s', self$access_token)
 
-            self$log$trace("request:", method=method, url=url)
+            self$log$debug("request:", method=method, url=url)
 
             if (method == 'GET') {
                 r <- httr::GET(url, httr::add_headers(Authorization=token))
@@ -225,7 +230,7 @@ Client <- R6::R6Class(
             }
 
             if (!is.element(r$status_code, c(200,201,202))) {
-                msg <- sprintf("Request to '%s' was unsuccesful: %s", url, httr::http_status(r)$message)
+                msg <- sprintf("Request to '%s' was unsuccessful: %s", url, httr::http_status(r)$message)
 
                 if (first_try) {
                     self$log$error(msg)
