@@ -378,7 +378,7 @@ Client <- R6::R6Class(
 
                     marshalled.result <- load_vantage6_formatted(rawBlock)
 
-                    # This has to be the last statement, otherwise things will break :@.
+                    # This has to be the last statement, is the returned value
                     marshalled.result
 
                 }, error = function(e) {
@@ -400,7 +400,7 @@ Client <- R6::R6Class(
                     errors <- c(errors, msg)
 
                 } else {
-                    results[[k]] <- marshalled.result[["result"]]
+                    results[[k]] <- marshalled.result
                 }
             }
 

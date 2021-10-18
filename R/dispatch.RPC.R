@@ -86,10 +86,10 @@ dispatch.RPC <- function(df, input, pkg='', token='') {
 
     result <- tryCatch({
         if (pkg == '') {
-            result <- list(result=do.call(method, args))
+            result <- do.call(method, args)
         } else {
             rpc <- eval(parse(text=sprintf("%s::%s", pkg, method)))
-            result <- list(result=do.call(rpc, args))
+            result <- do.call(rpc, args)
         }
 
     }, error = function(e) {
