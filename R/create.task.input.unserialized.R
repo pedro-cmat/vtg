@@ -7,6 +7,7 @@
 #' @param use.master.container logical Indicates whether the task should be run in a
 #'   master container.
 #' @param method Character vector (string) of the method to run.
+#' @param output_format Format of the returned values
 #' @param ... Arguments and keyword arguments
 #'
 #' @return [list()] with keys `master`, `debug`, `method`, `args`, `kwargs`
@@ -24,7 +25,9 @@ create.task.input.unserialized = function(use.master.container, method, output_f
 
     if (is.null(names(arguments))) {
         args <- arguments
-        kwargs <- list()
+        # use `pairlist` as toJSON parses that to {} istead of []. If kwargs
+        # is a [] the Python algorithms will fail.
+        kwargs <- pairlist()
 
     } else {
         args <- arguments[names(arguments) == ""]
@@ -32,7 +35,7 @@ create.task.input.unserialized = function(use.master.container, method, output_f
     }
 
     # Create the data structure
-    input_data <- list(
+    list(
         master=use.master.container,
         debug=get.option('debug.container'),
         method=method,
@@ -40,6 +43,5 @@ create.task.input.unserialized = function(use.master.container, method, output_f
         kwargs=kwargs,
         output_format=output_format
     )
-
-    return(input_data)
 }
+
