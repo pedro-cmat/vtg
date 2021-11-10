@@ -82,7 +82,7 @@ MockClient <- R6::R6Class(
             results <- list()
 
             for (k in 1:length(site_results)) {
-                results[[k]] <- site_results[[k]][["result"]][["result"]]
+                results[[k]] <- site_results[[k]][["result"]]
             }
 
             return(results)
