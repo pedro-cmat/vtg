@@ -41,6 +41,7 @@ Client <- R6::R6Class(
         privkey = NULL,
         SEPARATOR = "$",
         data_format = NULL,
+        organizations = NULL,
 
         log = NULL,
 
@@ -48,14 +49,18 @@ Client <- R6::R6Class(
         #' @param username [character()] (optional) Username
         #' @param password [character()] (optional) Password
         #' @param collaboration_id [integer()] (optional) Collaboration id
+        #' @param organizations [integer()] (optional) organization ids that are within a collaboration
         #' @param api_path [character()] (optional) API path
-        initialize = function(host, username='', password='', collaboration_id=NULL, api_path='') {
+        #' @param log_level [character()] (optional) Logger level
+        initialize = function(host, username='', password='', collaboration_id=NULL, organizations=NULL, api_path='', log_level='info') {
             self$host <- host
             self$username <- username
             self$password <- password
             self$collaboration_id <- collaboration_id
+            self$organizations = organizations
             self$api_path <- api_path
             self$log <- lgr::get_logger_glue("vtg/Client")
+            lgr::basic_config(threshold = log_level)
 
             url <- glue::glue('{host}{api_path}/version')
             r <- httr::GET(url)
@@ -129,13 +134,20 @@ Client <- R6::R6Class(
                 collaboration_id <- as.character(collab$id)
                 endpoint <- glue::glue('/collaboration/{collaboration_id}')
                 collaboration <- httr::content(self$GET(collab$link, prefix.api.path=F))
-                collaborations[[collaboration_id]] <- collaboration$name
+
+                organization_ids <- c()
+                for (org in collaboration$organizations) {
+                    organization_ids <- append(organization_ids, org$id)
+                }
+                collaborations <- append(collaborations,
+                                         list(id=collaboration_id,
+                                              name=collaboration$name,
+                                              organizations=organization_ids)
+                                         )
             }
 
 
-            collaborations <- data.frame(unlist(collaborations))
-            collaborations <- cbind(id=rownames(collaborations), collaborations)
-            colnames(collaborations) <- c('id', 'name')
+            collaborations <- data.frame(collaborations)
 
             return(collaborations)
         },
@@ -150,6 +162,10 @@ Client <- R6::R6Class(
             return(httr::content(
                 self$GET(sprintf('/collaboration/%i', collaboration_id))
             ))
+        },
+
+        setOrganizations = function(organizations) {
+            self$organizations = organizations
         },
 
         setCollaborationId = function(collaboration_id) {
@@ -375,7 +391,7 @@ Client <- R6::R6Class(
                                       machine="hex", type="char",
                                       size=1, endian=.Platform$endian, signed=TRUE)
                     class(rawBlock) <- "rawBlock"
-
+                    self$log$debug('format back')
                     marshalled.result <- load_vantage6_formatted(rawBlock)
 
                     # This has to be the last statement, is the returned value
@@ -384,6 +400,7 @@ Client <- R6::R6Class(
                 }, error = function(e) {
                     self$log$error("could not read results:")
                     self$log$error('Site results:')
+                    print(site_results[[k]])
                     self$log$error(jsonlite::toJSON(site_results[[k]], pretty=T, auto_unbox=T))
                     self$log$error('')
                     self$log$error(e)
@@ -473,27 +490,43 @@ Client <- R6::R6Class(
 
             serialized.input <- dump_vantage6_formatted(input, self$data_format)
 
+            if (is.null(self$organizations)){
+                for (org in self$collaboration$organizations) {
+                    self$organizations <- append(self$organizations, org$id)
+                }
+            }
             # If we're using encryption, we'll need to encrypt the input for each organization
             # individually (using the organization's public key).
             organizations <- c()
-
+            j <- 1
             for (i in 1:length(self$collaboration$organizations)) {
-                org <- self$collaboration$organizations[[i]]
+                cur_org <- self$collaboration$organizations[[i]]
 
-                if (self$using_encryption) {
-                    # Returns a string containing 3 base64 encoded components, separated by
-                    # a '$':
-                    #   1: (RSA) encrypted key,
-                    #   2: initialization vector (iv),
-                    #   3: (AES) encrypted body
-                    input <- self$encrypt(serialized.input, org)
 
-                } else {
-                    input <- openssl::base64_encode(serialized.input)
+                if (cur_org$id %in% self$organizations) {
+                    if (self$using_encryption) {
+
+                        # Returns a string containing 3 base64 encoded components, separated by
+                        # a '$':
+                        #   1: (RSA) encrypted key,
+                        #   2: initialization vector (iv),
+                        #   3: (AES) encrypted body
+                        self$log$debug('Encrypting input for organization', cur_org$id)
+                        input <- self$encrypt(serialized.input, cur_org)
+
+                    } else {
+                        input <- openssl::base64_encode(serialized.input)
+                    }
+                    organizations[[j]] <- list(id=cur_org$id, input=input)
                 }
 
-                organizations[[i]] <- list(id=org$id, input=input)
             }
+            self$log$debug('input prepared')
+            if (length(organizations) == 0) {
+                self$log$error('No organizations.. (are your selected organization in your collaboration?)')
+                return()
+            }
+
 
             task = list(
                 "name"=self$task.name,
@@ -508,8 +541,8 @@ Client <- R6::R6Class(
             r <- self$POST('/task', task)
             task <- httr::content(r)
 
-            vtg::log$info(sprintf('Task has been assigned id %i', task$id))
-            vtg::log$info(sprintf(' run id %i', task$id))
+            self$log$info(sprintf('Task has been assigned id %i', task$id))
+            self$log$info(sprintf(' run id %i', task$id))
 
             # Wait for the results to come in
             # task <- self$wait.for.results(task)

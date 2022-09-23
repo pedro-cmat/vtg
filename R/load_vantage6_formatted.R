@@ -12,17 +12,21 @@ load_vantage6_formatted <- function(rawbindata){
     #' RDS.
     #' :param file: input file received from vantage6 infrastructure.
     #' :return: * input data for the algorithm.
-
     splitted_data <- read_data_format(rawbindata)
     data_format <- splitted_data$data_format
     dot_location <- splitted_data$dot_location
 
     #supported data formats for the R client: json, rds
-    if((is.element(data_format, list('json', 'rds')))){
+    if((is.element(data_format, list('json', 'rds', 'empty', 'string')))){
         if(data_format == 'json'){
             input_data = read_json_data(rawbindata, dot_location)
         } else if(data_format == 'rds'){
             input_data = read_rds_data(rawbindata, dot_location)
+        } else if(data_format == 'string'){
+            input_data = read_string(rawbindata)
+        } else if (data_format == 'empty'){
+            print('empty result?')
+            input_data = ''
         }
     } else {
         stop(sprintf('%s is not supported.', data_format))
@@ -39,10 +43,25 @@ read_data_format <- function(rawbindata){
     #' :param file: raw binary data.
     #' :return: * data format ('json' or 'rds'),
     #'          * period/dot location which is needed to retrieve the data.
-
     data_format <- list()
-    for(i in seq(MAX_FORMAT_STRING_LENGTH)){
+    # if the message is empty
+
+    for(i in seq(MAX_FORMAT_STRING_LENGTH) ){
+
+        if (is.na(hexView::blockValue(rawbindata)[1])) {
+            data_format <- 'empty'
+            break
+        }
+
         char <- hexView::blockValue(rawbindata)[i]
+        # in case of a very short message, which has no data format
+        # we assume its a short string
+        print(char)
+        if (is.na(char)){
+            data_format <- 'string'
+            i <- 0
+            break
+        }
         if( char != DATA_FORMAT_SEPARATOR){
             data_format[[i]] <- char
         } else {
@@ -50,7 +69,7 @@ read_data_format <- function(rawbindata){
             break
         }
     }
-    if((!is.element(data_format, list('json', 'rds')))){
+    if((!is.element(data_format, list('json', 'rds', 'empty', 'string')))){
         warning('No supported data format prepended. Proceding, assuming it is RDS.')
         i = 0
         data_format = 'rds' # default data format if none specified
@@ -81,5 +100,15 @@ read_rds_data <- function(rawbindata, dot_location){
     rds_data <- rawbindata$fileRaw[(dot_location+1):length(rawbindata$fileRaw)]
     data <- readRDS(gzcon(rawConnection(rds_data)))
     return(data)
+}
+
+read_string <- function(rawbindata){
+    data <- list()
+    for(i in seq(from=1, to=rawbindata$nbytes)){
+        char <- hexView::blockValue(rawbindata)[i]
+        data[[i]] <- char
+    }
+    string_data <- paste(data, collapse='')
+    return(string_data)
 }
 
