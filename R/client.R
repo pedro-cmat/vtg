@@ -490,6 +490,11 @@ Client <- R6::R6Class(
 
             serialized.input <- dump_vantage6_formatted(input, self$data_format)
 
+            if (is.null(self$organizations)){
+                for (org in self$collaboration$organizations) {
+                    self$organizations <- append(self$organizations, org$id)
+                }
+            }
             # If we're using encryption, we'll need to encrypt the input for each organization
             # individually (using the organization's public key).
             organizations <- c()
@@ -497,7 +502,8 @@ Client <- R6::R6Class(
             for (i in 1:length(self$collaboration$organizations)) {
                 cur_org <- self$collaboration$organizations[[i]]
 
-                if (cur_org %in% self$organizations || is.null(self$organizations)) {
+
+                if (cur_org$id %in% self$organizations) {
                     if (self$using_encryption) {
 
                         # Returns a string containing 3 base64 encoded components, separated by
@@ -516,6 +522,10 @@ Client <- R6::R6Class(
 
             }
             self$log$debug('input prepared')
+            if (length(organizations) == 0) {
+                self$log$error('No organizations.. (are your selected organization in your collaboration?)')
+                return()
+            }
 
 
             task = list(
