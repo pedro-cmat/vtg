@@ -519,6 +519,7 @@ Client <- R6::R6Class(
                     }
                     organizations[[j]] <- list(id=cur_org$id, input=input)
                 }
+                j <- j + 1
 
             }
             self$log$debug('input prepared')
