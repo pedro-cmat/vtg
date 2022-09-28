@@ -128,7 +128,7 @@ Client <- R6::R6Class(
             organization <- self$getOrganization(organization_id)
 
             collaborations <- list()
-
+            j <- 1
             for (collab in organization$collaborations) {
                 # self$log$debug(glue::glue('Processing collaboration {collab$id}'))
                 collaboration_id <- as.character(collab$id)
@@ -139,17 +139,15 @@ Client <- R6::R6Class(
                 for (org in collaboration$organizations) {
                     organization_ids <- append(organization_ids, org$id)
                 }
-                collaborations <- append(collaborations,
-                                         list(id=collaboration_id,
-                                              name=collaboration$name,
-                                              organizations=organization_ids)
-                                         )
+
+
+                collaborations[[j]] <- list(id=collaboration_id,
+                                            name=collaboration$name,
+                                            organizations=organization_ids)
+                j <- j + 1
             }
-
-
-            collaborations <- data.frame(collaborations)
-
             return(collaborations)
+
         },
 
         getOrganization = function(organization_id) {
