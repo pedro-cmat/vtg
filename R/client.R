@@ -517,8 +517,8 @@ Client <- R6::R6Class(
                         input <- openssl::base64_encode(serialized.input)
                     }
                     organizations[[j]] <- list(id=cur_org$id, input=input)
+                    j <- j + 1
                 }
-                j <- j + 1
 
             }
             self$log$debug('input prepared')
