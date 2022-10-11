@@ -245,6 +245,7 @@ Client <- R6::R6Class(
 
             if (!is.element(r$status_code, c(200,201,202))) {
                 msg <- sprintf("Request to '%s' was unsuccessful: %s", url, httr::http_status(r)$message)
+                self$log$debug(httr::content(r)$msg)
 
                 if (first_try) {
                     self$log$error(msg)
