@@ -28,9 +28,10 @@ docker.wrapper <- function(pkg='') {
     # TODO: Consider wrapping function body in a tryCatch clause.
     #       This way any issues with dispatching can be more easily debugged.
 
-    database_uri <- Sys.getenv("DATABASE_URI")
-    writeln(sprintf("Using '%s' as database", database_uri))
-    df <- read.csv(database_uri)
+    #database_uri <- Sys.getenv("DATABASE_URI")
+    #writeln(sprintf("Using '%s' as database", database_uri))
+    #df <- read.csv(database_uri)
+    df <- NULL
 
     # Read the contents of file input.txt into 'input_data'
     input_file <- Sys.getenv("INPUT_FILE")
